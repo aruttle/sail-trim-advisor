@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sail Trim Advisor</title>
+  <style>
+    :root {
+      --bg: #0b1720;
+      --panel: #132633;
+      --panel-2: #183445;
+      --text: #eaf4f7;
+      --muted: #a9c0c9;
+      --accent: #56c2a3;
+      --accent-2: #8be0c8;
+      --warn: #ffd166;
+      --danger: #ff7b7b;
+      --border: rgba(255,255,255,0.1);
+      --shadow: 0 12px 30px rgba(0,0,0,0.25);
+      --radius: 18px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background:
+        radial-gradient(circle at top right, rgba(86,194,163,0.15), transparent 25%),
+        linear-gradient(180deg, #0a141c, #0f202c 40%, #0d1821 100%);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    .hero {
+      margin-bottom: 24px;
+      padding: 28px;
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      background: linear-gradient(180deg, rgba(19,38,51,0.95), rgba(24,52,69,0.92));
+      box-shadow: var(--shadow);
+    }
+
+    .hero h1 {
+      margin: 0 0 10px;
+      font-size: clamp(1.8rem, 3vw, 2.8rem);
+      line-height: 1.1;
+    }
+
+    .hero p {
+      margin: 0;
+      color: var(--muted);
+      max-width: 760px;
+      font-size: 1rem;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1.05fr 0.95fr;
+      gap: 22px;
+    }
+
+    .panel {
+      background: rgba(19,38,51,0.92);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 20px;
+    }
+
+    .panel h2 {
+      margin-top: 0;
+      margin-bottom: 16px;
+      font-size: 1.25rem;
+    }
+
+    .panel p.helper {
+      color: var(--muted);
+      margin-top: -6px;
+      margin-bottom: 18px;
+      font-size: 0.95rem;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .field.full {
+      grid-column: 1 / -1;
+    }
+
+    label {
+      font-weight: 700;
+      font-size: 0.95rem;
+    }
+
+    select,
+    input[type="number"] {
+      width: 100%;
+      padding: 12px 14px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: var(--panel-2);
+      color: var(--text);
+      font-size: 1rem;
+    }
+
+    select:focus,
+    input:focus,
+    button:focus {
+      outline: 2px solid var(--accent-2);
+      outline-offset: 2px;
+    }
+
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding-top: 10px;
+    }
+
+    input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--accent);
+    }
+
+    .actions {
+      display: flex;
+      gap: 12px;
+      margin-top: 18px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      border: 0;
+      border-radius: 999px;
+      padding: 12px 18px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.15s ease, opacity 0.15s ease;
+    }
+
+    button:hover { transform: translateY(-1px); }
+    button:active { transform: translateY(0); }
+
+    .btn-primary {
+      background: linear-gradient(180deg, var(--accent-2), var(--accent));
+      color: #07231d;
+    }
+
+    .btn-secondary {
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    .summary-cards {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .mini-card {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px;
+    }
+
+    .mini-card .label {
+      color: var(--muted);
+      font-size: 0.82rem;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .mini-card .value {
+      font-size: 1rem;
+      font-weight: 700;
+    }
+
+    .section {
+      margin-top: 18px;
+      padding-top: 18px;
+      border-top: 1px solid var(--border);
+    }
+
+    .section h3 {
+      margin: 0 0 12px;
+      font-size: 1.05rem;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-size: 0.92rem;
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+
+    .pill.safe { background: rgba(86,194,163,0.15); color: var(--accent-2); }
+    .pill.warn { background: rgba(255,209,102,0.14); color: var(--warn); }
+    .pill.danger { background: rgba(255,123,123,0.16); color: var(--danger); }
+
+    ul.result-list {
+      margin: 0;
+      padding-left: 20px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .result-list li {
+      line-height: 1.45;
+    }
+
+    .note {
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .empty-state {
+      color: var(--muted);
+      line-height: 1.6;
+      padding: 12px 0;
+    }
+
+    .disclaimer {
+      margin-top: 20px;
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+
+    .footer-tip {
+      margin-top: 20px;
+      padding: 14px;
+      border-radius: 14px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    @media (max-width: 900px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+
+      .summary-cards,
+      .form-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <section class="hero">
+      <h1>Sail Trim Advisor</h1>
+      <p>
+        Enter the conditions, how the boat feels, and your current sail setup. The app suggests sensible trim changes in priority order, including mainsheet, traveller, headsail trim, outhaul, backstay, and kicker/vang.
+      </p>
+    </section>
+
+    <main class="grid">
+      <section class="panel">
+        <h2>Conditions</h2>
+        <p class="helper">This first version uses simple rule-based logic, which is good news: transparent, editable, and free.</p>
+
+        <form id="trimForm">
+          <div class="form-grid">
+            <div class="field">
+              <label for="pointOfSail">Point of sail</label>
+              <select id="pointOfSail" required>
+                <option value="close_hauled">Close-hauled</option>
+                <option value="close_reach">Close reach</option>
+                <option value="beam_reach">Beam reach</option>
+                <option value="broad_reach">Broad reach</option>
+                <option value="run">Run</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="windSpeed">Wind speed (knots)</label>
+              <input id="windSpeed" type="number" min="0" max="60" step="1" value="14" required />
+            </div>
+
+            <div class="field">
+              <label for="windTrend">Wind trend</label>
+              <select id="windTrend">
+                <option value="steady">Steady</option>
+                <option value="building">Building</option>
+                <option value="easing">Easing</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="seaState">Sea state</label>
+              <select id="seaState">
+                <option value="flat">Flat</option>
+                <option value="chop">Slight chop</option>
+                <option value="rough">Rough</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="heel">Heel</label>
+              <select id="heel">
+                <option value="low">Low</option>
+                <option value="medium" selected>Medium</option>
+                <option value="high">High</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="helm">Helm feel</label>
+              <select id="helm">
+                <option value="neutral">Neutral</option>
+                <option value="weather" selected>Weather helm</option>
+                <option value="lee">Lee helm</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="mainsailSetup">Mainsail setup</label>
+              <select id="mainsailSetup">
+                <option value="full">Full main</option>
+                <option value="reef1">1 reef</option>
+                <option value="reef2">2 reefs</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="headsailSetup">Headsail setup</label>
+              <select id="headsailSetup">
+                <option value="genoa_full">Full genoa</option>
+                <option value="genoa_partial">Partly furled genoa</option>
+                <option value="jib">Jib</option>
+              </select>
+            </div>
+
+            <div class="field full checkbox-row">
+              <input id="gusty" type="checkbox" />
+              <label for="gusty">Gusty conditions</label>
+            </div>
+          </div>
+
+          <div class="actions">
+            <button class="btn-primary" type="submit">Get trim advice</button>
+            <button class="btn-secondary" type="button" id="resetBtn">Reset</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="panel" id="resultsPanel">
+        <h2>Recommendations</h2>
+        <div id="results" class="empty-state">
+          Pick the conditions and click <strong>Get trim advice</strong>. The result panel will suggest what to change first, why, and what to watch next.
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const pointOfSailProfiles = {
+      close_hauled: {
+        label: 'Close-hauled',
+        goal: 'Point high while keeping speed',
+        main: 'Keep the main fairly tight with the boom near centreline.',
+        headsail: 'Trim jib or genoa in hard with telltales streaming.',
+        sailShape: 'Keep both sails relatively flat with the draft forward.',
+        kicker: 'Use light to moderate kicker. Upwind, mainsheet usually does most of the leech control.',
+        watch: 'Avoid pinching. Build speed first, then point.',
+      },
+      close_reach: {
+        label: 'Close reach',
+        goal: 'Fast and efficient with balanced power',
+        main: 'Ease the mainsheet slightly from close-hauled trim.',
+        headsail: 'Ease the headsail a little to keep flow clean through the slot.',
+        sailShape: 'Use medium-flat shapes with controlled twist.',
+        kicker: 'Use moderate kicker as the boom goes out and mainsheet loses vertical pull.',
+        watch: 'This point of sail loves speed but punishes over-sheeting.',
+      },
+      beam_reach: {
+        label: 'Beam reach',
+        goal: 'Maximum drive and stable power',
+        main: 'Ease the main well out and keep the leech working.',
+        headsail: 'Ease the headsail to match the new apparent wind angle.',
+        sailShape: 'Use medium depth. Do not let the top of the main spill all its power away.',
+        kicker: 'Use moderate to firm kicker. It matters more now.',
+        watch: 'Watch for boom lift, heavy helm, and too much heel.',
+      },
+      broad_reach: {
+        label: 'Broad reach',
+        goal: 'Fast reaching with control and stability',
+        main: 'Ease the main well out, but keep it stable rather than flapping.',
+        headsail: 'Ease the headsail well out. A pole or barber-hauler helps if available.',
+        sailShape: 'Use fuller shapes with supported leech tension.',
+        kicker: 'Use firm kicker to stop the main twisting off too much.',
+        watch: 'Rolling and accidental gybes creep closer here.',
+      },
+      run: {
+        label: 'Run',
+        goal: 'Sail deep while keeping the rig settled',
+        main: 'Ease the main all the way out with care.',
+        headsail: 'Pole out the headsail or sail wing-on-wing if appropriate and safe.',
+        sailShape: 'Keep sails full and stable rather than pretty.',
+        kicker: 'Use firm to strong kicker. Downwind, it becomes one of the star controls.',
+        watch: 'Prioritise stability and gybe prevention over elegance.',
+      },
+    };
+
+    function getWindBand(knots) {
+      if (knots <= 8) return 'light';
+      if (knots <= 16) return 'moderate';
+      if (knots <= 24) return 'fresh';
+      return 'strong';
+    }
+
+    function createAction(priority, control, action, detail) {
+      return { priority, control, action, detail };
+    }
+
+    function getBaseActions(input) {
+      const actions = [];
+      switch (input.pointOfSail) {
+        case 'close_hauled':
+          actions.push(
+            createAction(1, 'Mainsheet', 'Trim in', 'Bring the boom near centreline without strangling the sail.'),
+            createAction(2, 'Headsail sheet', 'Trim in', 'Keep telltales flowing and the slot clean.'),
+            createAction(3, 'Kicker / vang', 'Light to moderate', 'Support leech tension, but let the mainsheet do most of the upwind work.')
+          );
+          break;
+        case 'close_reach':
+          actions.push(
+            createAction(1, 'Mainsheet', 'Ease slightly', 'Free the main from full upwind trim.'),
+            createAction(2, 'Headsail sheet', 'Ease slightly', 'Open the slot and keep flow attached.'),
+            createAction(3, 'Kicker / vang', 'Moderate', 'Control upper twist as the boom moves out.')
+          );
+          break;
+        case 'beam_reach':
+          actions.push(
+            createAction(1, 'Mainsheet', 'Ease well out', 'Set the main for drive rather than pointing.'),
+            createAction(2, 'Headsail sheet', 'Ease to match', 'Keep the luff full without collapsing.'),
+            createAction(3, 'Kicker / vang', 'Moderate to firm', 'Stop the boom lifting and top of main twisting away.')
+          );
+          break;
+        case 'broad_reach':
+          actions.push(
+            createAction(1, 'Mainsheet', 'Ease well out', 'Keep the main drawing and stable.'),
+            createAction(2, 'Kicker / vang', 'Firm', 'Support leech tension and reduce excessive twist.'),
+            createAction(3, 'Headsail sheet', 'Ease well out', 'Trim for stable flow, not a bar-tight leech.')
+          );
+          break;
+        case 'run':
+          actions.push(
+            createAction(1, 'Kicker / vang', 'Firm to strong', 'Hold boom height and keep the upper leech useful.'),
+            createAction(2, 'Mainsheet', 'Ease fully', 'Let the boom out while keeping the sail stable.'),
+            createAction(3, 'Headsail setup', 'Pole out or wing-on-wing', 'Use a stable downwind arrangement if safe and available.')
+          );
+          break;
+      }
+      return actions;
+    }
+
+    function getWindActions(input, windBand) {
+      const actions = [];
+      if (windBand === 'light') {
+        actions.push(
+          createAction(4, 'Outhaul', 'Ease slightly', 'Add a little depth for power in lighter air.'),
+          createAction(5, 'Halyard / Cunningham', 'Keep light', 'Do not over-flatten the sails in soft breeze.')
+        );
+      }
+
+      if (windBand === 'moderate') {
+        actions.push(
+          createAction(4, 'Outhaul', 'Set medium', 'Keep shape controlled without draining all the power.'),
+          createAction(5, 'Trim mode', 'Balanced', 'Aim for speed first, then tidy up for angle.')
+        );
+      }
+
+      if (windBand === 'fresh') {
+        actions.push(
+          createAction(4, 'Outhaul', 'Tighten', 'Flatten the main to reduce heel.'),
+          createAction(5, 'Backstay', 'Increase', 'Reduce fullness and move draft forward if your rig allows it.')
+        );
+      }
+
+      if (windBand === 'strong') {
+        actions.push(
+          createAction(4, 'Reefing', 'Reef early', 'Control and balance beat raw stubbornness every time.'),
+          createAction(5, 'Outhaul / Cunningham / Backstay', 'Tighten', 'Flatten the sails hard and spill gust power cleanly.')
+        );
+      }
+
+      return actions;
+    }
+
+    function getSymptomActions(input, windBand) {
+      const actions = [];
+
+      if (input.heel === 'high') {
+        actions.push(
+          createAction(1, 'Traveller', 'Lower slightly', 'Reduce angle of attack without completely emptying the main.'),
+          createAction(2, 'Outhaul', 'Tighten', 'Flatten the lower main and calm the boat down.')
+        );
+
+        if (windBand === 'fresh' || windBand === 'strong' || input.windTrend === 'building') {
+          actions.push(
+            createAction(1, 'Reefing', 'Consider reef now', 'The boat is already telling you a story. Listen before it starts shouting.')
+          );
+        }
+      }
+
+      if (input.helm === 'weather') {
+        actions.push(
+          createAction(1, 'Main depower', 'Depower main first', 'Heavy weather helm usually means the main is driving the boat over on its ear.'),
+          createAction(2, 'Traveller', 'Ease down a touch', 'Reduce helm load while keeping shape.'),
+          createAction(3, 'Headsail sheet', 'Ease one small step if slot is tight', 'Let the front of the rig breathe.')
+        );
+      }
+
+      if (input.helm === 'lee') {
+        actions.push(
+          createAction(1, 'Balance', 'Bring power aft carefully', 'Lee helm needs balance correction, not brute force.'),
+          createAction(2, 'Main trim', 'Trim in slightly', 'Add a little aft-driving force.'),
+          createAction(3, 'Headsail', 'Avoid overpowering the foretriangle', 'Too much forward drive can worsen lee helm.')
+        );
+      }
+
+      if (input.gusty) {
+        actions.push(
+          createAction(2, 'Twist control', 'Leave enough twist to spill gusts', 'A little breathing room saves drama.'),
+          createAction(3, 'Traveller', 'Use actively', 'Traveller is often kinder than sheeting changes in gusts.')
+        );
+      }
+
+      if (input.seaState === 'rough') {
+        actions.push(
+          createAction(2, 'Sail shape', 'Keep a touch more depth', 'In waves, a boat often needs punch more than knife-edge pointing.'),
+          createAction(3, 'Steering', 'Sail for speed through chop', 'Foot slightly if needed instead of pinching into each wave.')
+        );
+      }
+
+      if (input.seaState === 'chop') {
+        actions.push(
+          createAction(3, 'Trim mode', 'Slightly more open and forgiving', 'A little extra flow helps the boat stay moving.')
+        );
+      }
+
+      if ((input.pointOfSail === 'broad_reach' || input.pointOfSail === 'run') && (windBand === 'fresh' || windBand === 'strong')) {
+        actions.push(
+          createAction(1, 'Gybe control', 'Use a preventer if appropriate', 'Downwind in breeze is where surprise arrives wearing boots.'),
+          createAction(2, 'Course choice', 'Consider sailing a touch hotter', 'Often faster and more stable than a dead run.')
+        );
+      }
+
+      return actions;
+    }
+
+    function getSailPlanActions(input, windBand) {
+      const actions = [];
+
+      if (input.mainsailSetup === 'full' && (windBand === 'fresh' || windBand === 'strong')) {
+        actions.push(
+          createAction(2, 'Main plan', 'Review reefing choice', 'A full main in stronger breeze is often the first suspect.')
+        );
+      }
+
+      if (input.headsailSetup === 'genoa_full' && (windBand === 'fresh' || windBand === 'strong')) {
+        actions.push(
+          createAction(2, 'Headsail plan', 'Part-furl or change down', 'An oversized genoa in breeze can load the helm and crowd the slot.')
+        );
+      }
+
+      if (input.headsailSetup === 'jib' && windBand === 'light') {
+        actions.push(
+          createAction(4, 'Headsail power', 'Use fuller trim', 'Smaller headsails need help in softer breeze.')
+        );
+      }
+
+      return actions;
+    }
+
+    function getUrgency(input, windBand) {
+      if (input.heel === 'high' && (windBand === 'fresh' || windBand === 'strong')) return { label: 'High priority', className: 'danger' };
+      if (input.gusty || input.windTrend === 'building' || windBand === 'fresh') return { label: 'Watch closely', className: 'warn' };
+      return { label: 'Routine trim', className: 'safe' };
+    }
+
+    function getWatchNext(input, windBand) {
+      const notes = [];
+
+      if (input.helm === 'weather') notes.push('If helm stays heavy after depowering the main, reef sooner rather than later.');
+      if (input.heel === 'high') notes.push('Aim to reduce heel before chasing more pointing angle.');
+      if (input.pointOfSail === 'beam_reach' || input.pointOfSail === 'broad_reach') notes.push('Look up at the top of the main. If it is dumping too much air, add more kicker.');
+      if (input.pointOfSail === 'run') notes.push('Guard against accidental gybes and prioritise stability over depth.');
+      if (input.seaState !== 'flat') notes.push('In waves, preserve speed. A slow boat is a grumpy boat.');
+      if (input.windTrend === 'building') notes.push('Conditions are rising. Set up early instead of trimming reactively later.');
+      if (windBand === 'light') notes.push('Avoid overtrimming. In light air, kindness beats force.');
+
+      return notes;
+    }
+
+    function sortAndDeduplicate(actions) {
+      const seen = new Set();
+      return actions
+        .sort((a, b) => a.priority - b.priority)
+        .filter(action => {
+          const key = `${action.control}|${action.action}|${action.detail}`;
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+    }
+
+    function buildRecommendation(input) {
+      const profile = pointOfSailProfiles[input.pointOfSail];
+      const windBand = getWindBand(input.windSpeed);
+      const urgency = getUrgency(input, windBand);
+
+      const actions = sortAndDeduplicate([
+        ...getBaseActions(input),
+        ...getWindActions(input, windBand),
+        ...getSymptomActions(input, windBand),
+        ...getSailPlanActions(input, windBand),
+      ]);
+
+      const reasoning = [
+        `Goal for this point of sail: ${profile.goal}.`,
+        `Base trim: ${profile.main} ${profile.headsail}`,
+        `Shape target: ${profile.sailShape}`,
+        `Kicker note: ${profile.kicker}`,
+      ];
+
+      if (windBand === 'light') reasoning.push('Wind strength is light, so preserve power and avoid over-flattening.');
+      if (windBand === 'moderate') reasoning.push('Wind strength is moderate, so aim for balanced power and tidy flow.');
+      if (windBand === 'fresh') reasoning.push('Wind strength is fresh, so depowering and balance start climbing the ladder of importance.');
+      if (windBand === 'strong') reasoning.push('Wind strength is strong, so control, reefing, and reduced heel take priority.');
+
+      return {
+        profile,
+        windBand,
+        urgency,
+        actions,
+        reasoning,
+        watchNext: getWatchNext(input, windBand),
+      };
+    }
+
+    function renderResults(recommendation, input) {
+      const results = document.getElementById('results');
+      const topActions = recommendation.actions.slice(0, 6);
+      const actionItems = topActions
+        .map(action => `<li><strong>${action.control}:</strong> ${action.action}. ${action.detail}</li>`)
+        .join('');
+
+      const reasoningItems = recommendation.reasoning
+        .map(item => `<li>${item}</li>`)
+        .join('');
+
+      const watchItems = recommendation.watchNext
+        .map(item => `<li>${item}</li>`)
+        .join('');
+
+      results.innerHTML = `
+        <div class="summary-cards">
+          <div class="mini-card">
+            <div class="label">Point of sail</div>
+            <div class="value">${recommendation.profile.label}</div>
+          </div>
+          <div class="mini-card">
+            <div class="label">Wind band</div>
+            <div class="value">${recommendation.windBand.charAt(0).toUpperCase() + recommendation.windBand.slice(1)}</div>
+          </div>
+          <div class="mini-card">
+            <div class="label">Current setup</div>
+            <div class="value">${input.mainsailSetup.toUpperCase()} / ${input.headsailSetup.replace('_', ' ')}</div>
+          </div>
+        </div>
+
+        <div class="pill ${recommendation.urgency.className}">${recommendation.urgency.label}</div>
+
+        <div class="section">
+          <h3>Best actions now</h3>
+          <ul class="result-list">${actionItems}</ul>
+        </div>
+
+        <div class="section">
+          <h3>Why</h3>
+          <ul class="result-list">${reasoningItems}</ul>
+        </div>
+
+        <div class="section">
+          <h3>Watch next</h3>
+          <ul class="result-list">${watchItems || '<li>Keep checking helm balance, heel, and sail flow after each change.</li>'}</ul>
+        </div>
+
+        <div class="footer-tip">
+          <strong>Trim memory card:</strong> upwind tends toward flat and tidy, reaching wants power with control, and downwind wants fuller sails with stronger vang support. In building breeze, reefing early is often the smartest move on the boat.
+        </div>
+
+        <div class="disclaimer">
+          This app gives practical starting advice, not gospel carved into a boom. Use judgment for your boat, rig, crew, and sea room.
+        </div>
+      `;
+    }
+
+    function getFormInput() {
+      return {
+        pointOfSail: document.getElementById('pointOfSail').value,
+        windSpeed: Number(document.getElementById('windSpeed').value),
+        windTrend: document.getElementById('windTrend').value,
+        seaState: document.getElementById('seaState').value,
+        heel: document.getElementById('heel').value,
+        helm: document.getElementById('helm').value,
+        mainsailSetup: document.getElementById('mainsailSetup').value,
+        headsailSetup: document.getElementById('headsailSetup').value,
+        gusty: document.getElementById('gusty').checked,
+      };
+    }
+
+    document.getElementById('trimForm').addEventListener('submit', function (event) {
+      event.preventDefault();
+      const input = getFormInput();
+      const recommendation = buildRecommendation(input);
+      renderResults(recommendation, input);
+    });
+
+    document.getElementById('resetBtn').addEventListener('click', function () {
+      document.getElementById('trimForm').reset();
+      document.getElementById('windSpeed').value = 14;
+      document.getElementById('heel').value = 'medium';
+      document.getElementById('helm').value = 'weather';
+      document.getElementById('results').innerHTML = 'Pick the conditions and click <strong>Get trim advice</strong>. The result panel will suggest what to change first, why, and what to watch next.';
+    });
+  </script>
+</body>
+</html>
