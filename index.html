@@ -9,35 +9,36 @@
 <body>
   <div class="container">
     <section class="hero">
+      <div class="hero-badge">Cockpit Mode</div>
       <h1>Sail Trim Advisor</h1>
       <p>
-        Search a location, pull live wind and wave forecast data, add your boat bearing,
-        and get practical sail trim advice for mainsheet, traveller, headsail, sail shape,
-        reefing, and kicker / vang.
+        Pull live wind and wave data, set or detect boat bearing, and get practical sail trim advice fast.
       </p>
     </section>
 
-    <main class="grid">
-      <section class="panel">
-        <h2>Conditions</h2>
-        <p class="helper">
-          Use live conditions from a location, or enter values manually.
-        </p>
+    <main class="cockpit-layout">
+      <section class="panel panel-primary">
+        <div class="panel-header">
+          <h2>Live Setup</h2>
+          <p class="helper">
+            Designed for quick use on a mobile device in the cockpit.
+          </p>
+        </div>
 
         <form id="trimForm">
-          <div class="form-grid">
+          <div class="cockpit-stack">
             <div class="field full location-field">
               <label for="locationQuery">Location</label>
               <div class="inline-input-row">
                 <input
                   id="locationQuery"
                   type="text"
-                  placeholder="e.g. Kilrush, County Clare or Dingle Harbour"
+                  placeholder="Search harbour, bay, or town"
                   autocomplete="off"
                   spellcheck="false"
                 />
                 <button class="btn-secondary fetch-btn" type="button" id="fetchConditionsBtn">
-                  Fetch conditions
+                  Fetch
                 </button>
               </div>
               <div id="locationSuggestions" class="suggestions hidden"></div>
@@ -50,48 +51,105 @@
             </div>
 
             <div class="field full">
+              <label for="boatProfile">Boat profile</label>
+              <select id="boatProfile">
+                <option value="masthead_cruiser">Masthead cruiser</option>
+                <option value="fractional_rig">Fractional rig</option>
+                <option value="trapper_501">Trapper 501</option>
+              </select>
+            </div>
+
+            <div class="field full">
+              <label for="boatBearing">Boat bearing</label>
+              <div class="inline-input-row">
+                <input id="boatBearing" type="number" min="0" max="360" step="1" value="120" />
+                <button class="btn-secondary fetch-btn" type="button" id="detectBearingBtn">
+                  Auto detect
+                </button>
+              </div>
+              <div id="bearingStatus" class="status-text bearing-status">
+                Bearing source: Manual entry.
+              </div>
+            </div>
+
+            <div class="quick-read-grid">
+              <div class="field">
+                <label for="pointOfSail">Point of sail</label>
+                <select id="pointOfSail" required disabled>
+                  <option value="in_irons">In Irons</option>
+                  <option value="close_hauled">Close-hauled</option>
+                  <option value="close_reach">Close reach</option>
+                  <option value="beam_reach">Beam reach</option>
+                  <option value="broad_reach">Broad reach</option>
+                  <option value="run">Run</option>
+                </select>
+                <div class="auto-field-note">Auto-calculated from boat and wind bearing.</div>
+              </div>
+
+              <div class="field">
+                <label for="pointOfSailAngle">Angle off the wind</label>
+                <input id="pointOfSailAngle" type="text" value="--" disabled />
+                <div class="auto-field-note">Smallest angle between heading and wind direction.</div>
+              </div>
+            </div>
+
+            <div class="field full">
+              <button class="btn-primary btn-large" type="submit">Get Trim Advice</button>
+            </div>
+
+            <div class="field full">
               <div id="liveConditionsCard" class="live-conditions-card hidden">
                 <div class="live-conditions-header">
-                  <h3>Live conditions</h3>
-                  <div id="liveConditionsPlace" class="live-place"></div>
+                  <div>
+                    <h3>Live conditions</h3>
+                    <div id="liveConditionsPlace" class="live-place"></div>
+                  </div>
+                  <div id="liveConditionsTime" class="live-time"></div>
                 </div>
 
-                <div class="live-conditions-grid">
-                  <div class="mini-card">
+                <div class="live-conditions-grid cockpit-live-grid">
+                  <div class="mini-card live-key-card">
                     <div class="label">Steady wind</div>
-                    <div id="liveWindSpeed" class="value">--</div>
+                    <div id="liveWindSpeed" class="value big-value">--</div>
                   </div>
-                  <div class="mini-card">
+
+                  <div class="mini-card live-key-card">
                     <div class="label">Gusts</div>
-                    <div id="liveGustSpeed" class="value">--</div>
+                    <div id="liveGustSpeed" class="value big-value">--</div>
                   </div>
-                  <div class="mini-card">
+
+                  <div class="mini-card live-key-card">
                     <div class="label">Wind direction</div>
                     <div id="liveWindDirection" class="value">--</div>
                   </div>
-                  <div class="mini-card">
+
+                  <div class="mini-card live-key-card">
                     <div class="label">Wave height</div>
-                    <div id="liveWaveHeight" class="value">--</div>
+                    <div id="liveWaveHeight" class="value big-value">--</div>
                   </div>
-                  <div class="mini-card">
+
+                  <div class="mini-card live-key-card">
                     <div class="label">Wave direction</div>
                     <div id="liveWaveDirection" class="value">--</div>
                   </div>
-                  <div class="mini-card">
+
+                  <div class="mini-card live-key-card">
                     <div class="label">Sea state</div>
                     <div id="liveSeaState" class="value">--</div>
                   </div>
 
-                  <div class="mini-card">
+                  <div class="mini-card live-key-card">
                     <div class="label">Boat bearing</div>
                     <div id="liveBoatBearing" class="value">--</div>
                     <div id="liveBearingSource" class="mini-subvalue">Source: --</div>
                   </div>
-                  <div class="mini-card">
+
+                  <div class="mini-card live-key-card">
                     <div class="label">Sea relationship</div>
                     <div id="liveSeaRelationship" class="value">--</div>
                   </div>
-                  <div class="mini-card">
+
+                  <div class="mini-card live-key-card">
                     <div class="label">Sea on boat</div>
                     <div id="liveSeaAngle" class="value">--</div>
                   </div>
@@ -101,141 +159,103 @@
                     <div id="liveDirectionCompass" class="compass-wrap"></div>
                   </div>
                 </div>
-
-                <div id="liveConditionsTime" class="live-time"></div>
               </div>
             </div>
 
-            <div class="field full">
-              <label for="boatProfile">Boat profile</label>
-              <select id="boatProfile">
-                <option value="masthead_cruiser">Masthead cruiser</option>
-                <option value="fractional_rig">Fractional rig</option>
-                <option value="trapper_501">Trapper 501</option>
-              </select>
-            </div>
+            <details class="advanced-panel">
+              <summary>Advanced trim inputs</summary>
 
-            <div class="field">
-              <label for="pointOfSail">Point of sail</label>
-              <select id="pointOfSail" required disabled>
-                <option value="in_irons">In Irons</option>
-                <option value="close_hauled">Close-hauled</option>
-                <option value="close_reach">Close reach</option>
-                <option value="beam_reach">Beam reach</option>
-                <option value="broad_reach">Broad reach</option>
-                <option value="run">Run</option>
-              </select>
-              <div class="auto-field-note">Auto-calculated from boat and wind bearing.</div>
-            </div>
+              <div class="advanced-grid">
+                <div class="field">
+                  <label for="windTrend">Wind trend</label>
+                  <select id="windTrend">
+                    <option value="steady">Steady</option>
+                    <option value="building">Building</option>
+                    <option value="easing">Easing</option>
+                  </select>
+                </div>
 
-            <div class="field">
-              <label for="pointOfSailAngle">Angle off the wind</label>
-              <input id="pointOfSailAngle" type="text" value="--" disabled />
-              <div class="auto-field-note">Smallest angle between boat bearing and wind direction.</div>
-            </div>
+                <div class="field">
+                  <label for="windSpeed">Steady wind (knots)</label>
+                  <input id="windSpeed" type="number" min="0" max="60" step="1" value="14" required />
+                </div>
 
-            <div class="field">
-              <label for="windTrend">Wind trend</label>
-              <select id="windTrend">
-                <option value="steady">Steady</option>
-                <option value="building">Building</option>
-                <option value="easing">Easing</option>
-              </select>
-            </div>
+                <div class="field">
+                  <label for="gustSpeed">Gust speed (knots)</label>
+                  <input id="gustSpeed" type="number" min="0" max="70" step="1" value="18" required />
+                </div>
 
-            <div class="field">
-              <label for="windSpeed">Steady wind (knots)</label>
-              <input id="windSpeed" type="number" min="0" max="60" step="1" value="14" required />
-            </div>
+                <div class="field">
+                  <label for="windDirection">Wind direction</label>
+                  <input id="windDirection" type="number" min="0" max="360" step="1" value="240" />
+                </div>
 
-            <div class="field">
-              <label for="gustSpeed">Gust speed (knots)</label>
-              <input id="gustSpeed" type="number" min="0" max="70" step="1" value="18" required />
-            </div>
+                <div class="field">
+                  <label for="waveHeight">Wave height (m)</label>
+                  <input id="waveHeight" type="number" min="0" max="20" step="0.1" value="0.8" />
+                </div>
 
-            <div class="field">
-              <label for="windDirection">Wind direction</label>
-              <input id="windDirection" type="number" min="0" max="360" step="1" value="240" />
-            </div>
+                <div class="field">
+                  <label for="waveDirection">Wave direction</label>
+                  <input id="waveDirection" type="number" min="0" max="360" step="1" value="250" />
+                </div>
 
-            <div class="field">
-              <label for="waveHeight">Wave height (m)</label>
-              <input id="waveHeight" type="number" min="0" max="20" step="0.1" value="0.8" />
-            </div>
+                <div class="field">
+                  <label for="seaState">Sea state</label>
+                  <select id="seaState">
+                    <option value="flat">Flat</option>
+                    <option value="chop">Slight chop</option>
+                    <option value="rough">Rough</option>
+                  </select>
+                </div>
 
-            <div class="field">
-              <label for="waveDirection">Wave direction</label>
-              <input id="waveDirection" type="number" min="0" max="360" step="1" value="250" />
-            </div>
+                <div class="field">
+                  <label for="heel">Heel</label>
+                  <select id="heel">
+                    <option value="low">Low</option>
+                    <option value="medium" selected>Medium</option>
+                    <option value="high">High</option>
+                  </select>
+                </div>
 
-            <div class="field">
-              <label for="seaState">Sea state</label>
-              <select id="seaState">
-                <option value="flat">Flat</option>
-                <option value="chop">Slight chop</option>
-                <option value="rough">Rough</option>
-              </select>
-            </div>
+                <div class="field">
+                  <label for="helm">Helm feel</label>
+                  <select id="helm">
+                    <option value="neutral">Neutral</option>
+                    <option value="weather" selected>Weather helm</option>
+                    <option value="lee">Lee helm</option>
+                  </select>
+                </div>
 
-            <div class="field full">
-              <label for="boatBearing">Boat bearing</label>
-              <div class="inline-input-row">
-                <input id="boatBearing" type="number" min="0" max="360" step="1" value="120" />
-                <button class="btn-secondary fetch-btn" type="button" id="detectBearingBtn">
-                  Auto detect bearing
-                </button>
+                <div class="field">
+                  <label for="mainsailSetup">Mainsail setup</label>
+                  <select id="mainsailSetup">
+                    <option value="full">Full main</option>
+                    <option value="reef1">1 reef</option>
+                    <option value="reef2">2 reefs</option>
+                  </select>
+                </div>
+
+                <div class="field">
+                  <label for="headsailSetup">Headsail setup</label>
+                  <select id="headsailSetup">
+                    <option value="genoa_full">Full genoa</option>
+                    <option value="genoa_partial">Partly furled genoa</option>
+                    <option value="jib">Jib</option>
+                  </select>
+                </div>
+
+                <div class="field full checkbox-row">
+                  <input id="gusty" type="checkbox" />
+                  <label for="gusty">Gusty conditions</label>
+                </div>
               </div>
-              <div id="bearingStatus" class="status-text bearing-status">
-                Bearing source: Manual entry.
-              </div>
-            </div>
+            </details>
 
-            <div class="field">
-              <label for="heel">Heel</label>
-              <select id="heel">
-                <option value="low">Low</option>
-                <option value="medium" selected>Medium</option>
-                <option value="high">High</option>
-              </select>
+            <div class="actions actions-secondary">
+              <button class="btn-secondary" type="button" id="saveScenarioBtn">Save scenario</button>
+              <button class="btn-secondary" type="button" id="resetBtn">Reset</button>
             </div>
-
-            <div class="field">
-              <label for="helm">Helm feel</label>
-              <select id="helm">
-                <option value="neutral">Neutral</option>
-                <option value="weather" selected>Weather helm</option>
-                <option value="lee">Lee helm</option>
-              </select>
-            </div>
-
-            <div class="field">
-              <label for="mainsailSetup">Mainsail setup</label>
-              <select id="mainsailSetup">
-                <option value="full">Full main</option>
-                <option value="reef1">1 reef</option>
-                <option value="reef2">2 reefs</option>
-              </select>
-            </div>
-
-            <div class="field">
-              <label for="headsailSetup">Headsail setup</label>
-              <select id="headsailSetup">
-                <option value="genoa_full">Full genoa</option>
-                <option value="genoa_partial">Partly furled genoa</option>
-                <option value="jib">Jib</option>
-              </select>
-            </div>
-
-            <div class="field full checkbox-row">
-              <input id="gusty" type="checkbox" />
-              <label for="gusty">Gusty conditions</label>
-            </div>
-          </div>
-
-          <div class="actions">
-            <button class="btn-primary" type="submit">Get trim advice</button>
-            <button class="btn-secondary" type="button" id="saveScenarioBtn">Save scenario</button>
-            <button class="btn-secondary" type="button" id="resetBtn">Reset</button>
           </div>
         </form>
 
@@ -248,17 +268,22 @@
         </section>
       </section>
 
-      <section class="panel" id="resultsPanel">
-        <h2>Recommendations</h2>
+      <section class="panel panel-results" id="resultsPanel">
+        <div class="panel-header">
+          <h2>Recommendations</h2>
+          <p class="helper">
+            Fast trim guidance appears here after you fetch conditions or update inputs.
+          </p>
+        </div>
+
         <div id="results" class="empty-state">
           Search a location or enter the conditions manually, then click
-          <strong>Get trim advice</strong>.
+          <strong>Get Trim Advice</strong>.
         </div>
       </section>
     </main>
   </div>
 
-  <!-- <script src="script.js"></script> -->
-  <script src="script.js?v=2"></script>
+  <script src="script.js"></script>
 </body>
 </html>

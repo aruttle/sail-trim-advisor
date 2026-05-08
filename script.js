@@ -653,7 +653,11 @@ async function fetchLiveConditions() {
   try {
     let location;
 
-    if (selectedLocation && document.getElementById("locationQuery").value.trim() === [selectedLocation.name, selectedLocation.admin1, selectedLocation.country].filter(Boolean).join(", ")) {
+    if (
+      selectedLocation &&
+      document.getElementById("locationQuery").value.trim() ===
+        [selectedLocation.name, selectedLocation.admin1, selectedLocation.country].filter(Boolean).join(", ")
+    ) {
       location = selectedLocation;
     } else {
       location = await geocodeLocation(query);
@@ -1138,53 +1142,65 @@ function renderNoteCards(recommendation, input) {
   `;
 }
 
-function getDiagramConfig(pointOfSail) {
+function getDiagramConfig(pointOfSail, boatBearing, windDirection) {
+  const angleOffWind = getAngleOffWind(boatBearing, windDirection);
+
+  const relativeWind = ((normalizeDegrees(windDirection) - normalizeDegrees(boatBearing)) + 360) % 360;
+  const tackSide = relativeWind < 180 ? "starboard" : "port";
+
   const configs = {
     in_irons: {
       label: "In Irons",
-      boomAngle: 8,
+      mainAngle: 8,
       jibAngle: 6,
-      windFrom: 0,
+      fullness: 0.18,
       caption: "The boat is too close to head-to-wind to generate proper drive. Recover steerage first."
     },
     close_hauled: {
       label: "Close-hauled",
-      boomAngle: 18,
+      mainAngle: 18,
       jibAngle: 14,
-      windFrom: 320,
-      caption: "Sails are trimmed fairly tight. Flat shape and modest vang support."
+      fullness: 0.2,
+      caption: "Sails are trimmed tight, fairly flat, and set for height with control."
     },
     close_reach: {
       label: "Close reach",
-      boomAngle: 32,
+      mainAngle: 32,
       jibAngle: 24,
-      windFrom: 300,
-      caption: "Main and headsail eased a little. Controlled power with moderate twist."
+      fullness: 0.28,
+      caption: "Main and headsail are eased a little for fast, efficient power."
     },
     beam_reach: {
       label: "Beam reach",
-      boomAngle: 58,
+      mainAngle: 58,
       jibAngle: 45,
-      windFrom: 270,
-      caption: "Boom and headsail eased well. Vang becomes more important to support the leech."
+      fullness: 0.38,
+      caption: "A powerful reaching setup with more open trim and stronger vang importance."
     },
     broad_reach: {
       label: "Broad reach",
-      boomAngle: 78,
+      mainAngle: 78,
       jibAngle: 66,
-      windFrom: 225,
-      caption: "Sails are fuller and more open. Keep the main stable and supported."
+      fullness: 0.5,
+      caption: "Sails are opened well out and carried fuller for controlled drive."
     },
     run: {
       label: "Run",
-      boomAngle: 92,
+      mainAngle: 92,
       jibAngle: 86,
-      windFrom: 180,
-      caption: "Deep downwind trim. Stability matters more than elegance. Stronger vang support helps."
+      fullness: 0.58,
+      caption: "Deep downwind trim. Stability matters more than elegance."
     }
   };
 
-  return configs[pointOfSail] || configs.close_hauled;
+  const base = configs[pointOfSail] || configs.close_hauled;
+
+  return {
+    ...base,
+    angleOffWind,
+    tackSide,
+    relativeWind
+  };
 }
 
 function polarPoint(cx, cy, radius, degrees) {
@@ -1196,66 +1212,299 @@ function polarPoint(cx, cy, radius, degrees) {
 }
 
 function renderDiagram(pointOfSail) {
-  const config = getDiagramConfig(pointOfSail);
+  const boatBearing = Number(document.getElementById("boatBearing").value) || 0;
+  const windDirection = Number(document.getElementById("windDirection").value) || 0;
+
+  const config = getDiagramConfig(pointOfSail, boatBearing, windDirection);
   const container = document.getElementById("diagramInner");
   if (!container) return;
 
-  const cx = 170;
-  const cy = 170;
-  const mastTop = { x: 170, y: 120 };
-  const mastBase = { x: 170, y: 190 };
+  const width = 360;
+  const height = 380;
+  const cx = 180;
+  const cy = 180;
 
-  const boomEnd = polarPoint(mastBase.x, mastBase.y, 92, 180 - config.boomAngle);
-  const jibClew = polarPoint(170, 145, 70, 180 - config.jibAngle);
-  const windStart = polarPoint(cx, cy, 132, config.windFrom);
-  const windMid = polarPoint(cx, cy, 82, config.windFrom);
+  const hullTop = 78;
+  const hullBottom = 292;
+  const mastTopY = 126;
+  const mastBaseY = 205;
+
+  const boatHeading = normalizeDegrees(boatBearing);
+  const windFrom = normalizeDegrees(windDirection);
+
+  const relativeWind = ((windFrom - boatHeading) + 360) % 360;
+  const onStarboardTack = relativeWind < 180;
+
+  const sailSideSign = onStarboardTack ? 1 : -1;
+
+  const mainAngle = config.mainAngle * sailSideSign;
+  const jibAngle = config.jibAngle * sailSideSign;
+  const fullness = config.fullness;
+
+  function rotatePoint(x, y, cx0, cy0, deg) {
+    const rad = deg * Math.PI / 180;
+    const dx = x - cx0;
+    const dy = y - cy0;
+    return {
+      x: cx0 + dx * Math.cos(rad) - dy * Math.sin(rad),
+      y: cy0 + dx * Math.sin(rad) + dy * Math.cos(rad)
+    };
+  }
+
+  function localPolarPoint(cx0, cy0, radius, degrees) {
+    const radians = (degrees - 90) * Math.PI / 180;
+    return {
+      x: cx0 + radius * Math.cos(radians),
+      y: cy0 + radius * Math.sin(radians)
+    };
+  }
+
+  function offsetControlPoint(a, b, offset, sideSign) {
+    const midX = (a.x + b.x) / 2;
+    const midY = (a.y + b.y) / 2;
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const len = Math.hypot(dx, dy) || 1;
+
+    const nx = -dy / len;
+    const ny = dx / len;
+
+    return {
+      x: midX + nx * offset * sideSign,
+      y: midY + ny * offset * sideSign
+    };
+  }
+
+  function describeTack() {
+    if (pointOfSail === "in_irons") return "Head to wind";
+    return onStarboardTack ? "Starboard tack" : "Port tack";
+  }
+
+  function buildAngleArcPath(cx0, cy0, r, startDeg, endDeg) {
+    const start = localPolarPoint(cx0, cy0, r, startDeg);
+    const end = localPolarPoint(cx0, cy0, r, endDeg);
+
+    let sweep = endDeg - startDeg;
+    if (sweep < 0) sweep += 360;
+
+    const largeArc = sweep > 180 ? 1 : 0;
+
+    return `M ${start.x} ${start.y} A ${r} ${r} 0 ${largeArc} 1 ${end.x} ${end.y}`;
+  }
+
+  function getArcDisplayDegrees(boatDeg, windDeg) {
+    const diffCW = ((windDeg - boatDeg) + 360) % 360;
+    const diffCCW = ((boatDeg - windDeg) + 360) % 360;
+
+    if (diffCW <= diffCCW) {
+      return { start: boatDeg, end: windDeg, value: diffCW };
+    }
+
+    return { start: windDeg, end: boatDeg, value: diffCCW };
+  }
+
+  const hullPointsBase = [
+    { x: 180, y: hullTop },
+    { x: 204, y: 106 },
+    { x: 214, y: 142 },
+    { x: 214, y: 248 },
+    { x: 202, y: 280 },
+    { x: 180, y: hullBottom },
+    { x: 158, y: 280 },
+    { x: 146, y: 248 },
+    { x: 146, y: 142 },
+    { x: 156, y: 106 }
+  ];
+
+  const hullPoints = hullPointsBase.map((p) => rotatePoint(p.x, p.y, cx, cy, boatHeading));
+  const hullPointsString = hullPoints.map((p) => `${p.x},${p.y}`).join(" ");
+
+  const mastTop = rotatePoint(180, mastTopY, cx, cy, boatHeading);
+  const mastBase = rotatePoint(180, mastBaseY, cx, cy, boatHeading);
+
+  const boomLength = 88;
+  const jibLength = 72;
+
+  const boomEnd = localPolarPoint(
+    mastBase.x,
+    mastBase.y,
+    boomLength,
+    boatHeading + 180 + mainAngle
+  );
+
+  const jibHead = rotatePoint(180, 132, cx, cy, boatHeading);
+  const jibTack = rotatePoint(180, 102, cx, cy, boatHeading);
+
+  const jibClew = localPolarPoint(
+    jibTack.x,
+    jibTack.y,
+    jibLength,
+    boatHeading + 180 + jibAngle
+  );
+
+  const mainCurveControl = offsetControlPoint(
+    mastTop,
+    boomEnd,
+    14 + fullness * 22,
+    onStarboardTack ? 1 : -1
+  );
+
+  const jibCurveControl = offsetControlPoint(
+    jibHead,
+    jibClew,
+    8 + fullness * 12,
+    onStarboardTack ? 1 : -1
+  );
+
+  const mainPath = `
+    M ${mastTop.x} ${mastTop.y}
+    L ${mastBase.x} ${mastBase.y}
+    L ${boomEnd.x} ${boomEnd.y}
+    Q ${mainCurveControl.x} ${mainCurveControl.y} ${mastTop.x} ${mastTop.y}
+    Z
+  `;
+
+  const jibPath = `
+    M ${jibHead.x} ${jibHead.y}
+    L ${jibTack.x} ${jibTack.y}
+    L ${jibClew.x} ${jibClew.y}
+    Q ${jibCurveControl.x} ${jibCurveControl.y} ${jibHead.x} ${jibHead.y}
+    Z
+  `;
+
+  const headingArrowEnd = localPolarPoint(cx, cy, 138, boatHeading);
+  const headingArrowStart = localPolarPoint(cx, cy, 26, boatHeading);
+
+  const windArrowStart = localPolarPoint(cx, cy, 146, windFrom);
+  const windArrowEnd = localPolarPoint(cx, cy, 82, windFrom);
+
+  const arcInfo = getArcDisplayDegrees(boatHeading, windFrom);
+  const arcPath = buildAngleArcPath(cx, cy, 112, arcInfo.start, arcInfo.end);
+
+  const arcMid = localPolarPoint(cx, cy, 124, arcInfo.start + (arcInfo.value / 2));
+
+  const labelWind = localPolarPoint(cx, cy, 160, windFrom);
+  const labelHeading = localPolarPoint(cx, cy, 154, boatHeading);
+
+  const tackLabel = describeTack();
 
   const svg = `
-    <svg viewBox="0 0 340 340" width="100%" height="100%" aria-label="Sail trim diagram">
+    <svg viewBox="0 0 ${width} ${height}" width="100%" height="100%" aria-label="Upgraded sail trim diagram">
       <defs>
-        <marker id="windArrow" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto">
+        <marker id="windArrowHead" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto">
           <polygon points="0 0, 8 3, 0 6" fill="#8be0c8"></polygon>
+        </marker>
+        <marker id="headingArrowHead" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#ffd166"></polygon>
         </marker>
       </defs>
 
-      <circle cx="170" cy="170" r="132" fill="none" stroke="rgba(255,255,255,0.08)" stroke-dasharray="5 7"/>
-      <circle cx="170" cy="170" r="82" fill="none" stroke="rgba(255,255,255,0.06)" stroke-dasharray="4 6"/>
+      <circle cx="${cx}" cy="${cy}" r="146" fill="none" stroke="rgba(255,255,255,0.08)" stroke-dasharray="5 7"/>
+      <circle cx="${cx}" cy="${cy}" r="112" fill="none" stroke="rgba(255,255,255,0.06)" stroke-dasharray="4 6"/>
+      <circle cx="${cx}" cy="${cy}" r="78" fill="none" stroke="rgba(255,255,255,0.04)" stroke-dasharray="4 6"/>
 
-      <text x="170" y="26" text-anchor="middle" fill="#a9c0c9" font-size="12">Bow</text>
-      <text x="170" y="334" text-anchor="middle" fill="#a9c0c9" font-size="12">Stern</text>
-      <text x="14" y="174" fill="#a9c0c9" font-size="12">Port</text>
-      <text x="296" y="174" fill="#a9c0c9" font-size="12">Starboard</text>
+      <path d="${arcPath}"
+            fill="none"
+            stroke="rgba(143, 211, 255, 0.85)"
+            stroke-width="7"
+            stroke-linecap="round" />
 
-      <line x1="${windStart.x}" y1="${windStart.y}" x2="${windMid.x}" y2="${windMid.y}"
-            stroke="#8be0c8" stroke-width="4" marker-end="url(#windArrow)" />
-      <text x="${windStart.x + 8}" y="${windStart.y - 8}" fill="#8be0c8" font-size="12">Wind</text>
+      <text x="${arcMid.x}" y="${arcMid.y}"
+            text-anchor="middle"
+            fill="#8fd3ff"
+            font-size="14"
+            font-weight="700">
+        ${config.angleOffWind}°
+      </text>
 
-      <path d="M170 60
-               C188 82, 198 110, 198 170
-               C198 230, 188 258, 170 280
-               C152 258, 142 230, 142 170
-               C142 110, 152 82, 170 60 Z"
-            fill="#dceff4" fill-opacity="0.9" stroke="#0b1720" stroke-width="2"/>
+      <line x1="${windArrowStart.x}" y1="${windArrowStart.y}"
+            x2="${windArrowEnd.x}" y2="${windArrowEnd.y}"
+            stroke="#8be0c8"
+            stroke-width="4"
+            marker-end="url(#windArrowHead)" />
 
-      <line x1="${mastTop.x}" y1="${mastTop.y}" x2="${mastBase.x}" y2="${mastBase.y}" stroke="#0b1720" stroke-width="4"/>
+      <text x="${labelWind.x}" y="${labelWind.y}"
+            text-anchor="middle"
+            fill="#8be0c8"
+            font-size="13"
+            font-weight="700">
+        Wind
+      </text>
 
-      <polygon points="170,120 170,190 ${boomEnd.x},${boomEnd.y}"
-               fill="rgba(86,194,163,0.35)"
-               stroke="#56c2a3"
-               stroke-width="2"/>
+      <line x1="${headingArrowStart.x}" y1="${headingArrowStart.y}"
+            x2="${headingArrowEnd.x}" y2="${headingArrowEnd.y}"
+            stroke="#ffd166"
+            stroke-width="4"
+            marker-end="url(#headingArrowHead)" />
 
-      <polygon points="170,120 170,145 ${jibClew.x},${jibClew.y}"
-               fill="rgba(139,224,200,0.22)"
-               stroke="#8be0c8"
-               stroke-width="2"/>
+      <text x="${labelHeading.x}" y="${labelHeading.y}"
+            text-anchor="middle"
+            fill="#ffd166"
+            font-size="13"
+            font-weight="700">
+        Heading
+      </text>
 
-      <line x1="170" y1="190" x2="${boomEnd.x}" y2="${boomEnd.y}" stroke="#56c2a3" stroke-width="3"/>
-      <line x1="170" y1="145" x2="${jibClew.x}" y2="${jibClew.y}" stroke="#8be0c8" stroke-width="3"/>
+      <polygon points="${hullPointsString}"
+               fill="#dceff4"
+               fill-opacity="0.92"
+               stroke="#0b1720"
+               stroke-width="2" />
 
-      <circle cx="170" cy="190" r="4" fill="#56c2a3"/>
-      <circle cx="170" cy="145" r="4" fill="#8be0c8"/>
+      <line x1="${mastTop.x}" y1="${mastTop.y}"
+            x2="${mastBase.x}" y2="${mastBase.y}"
+            stroke="#0b1720"
+            stroke-width="4" />
 
-      <text x="170" y="315" text-anchor="middle" fill="#eaf4f7" font-size="14" font-weight="700">${config.label}</text>
+      <path d="${mainPath}"
+            fill="rgba(86,194,163,0.34)"
+            stroke="#56c2a3"
+            stroke-width="2" />
+
+      <path d="${jibPath}"
+            fill="rgba(139,224,200,0.22)"
+            stroke="#8be0c8"
+            stroke-width="2" />
+
+      <line x1="${mastBase.x}" y1="${mastBase.y}"
+            x2="${boomEnd.x}" y2="${boomEnd.y}"
+            stroke="#56c2a3"
+            stroke-width="3" />
+
+      <line x1="${jibTack.x}" y1="${jibTack.y}"
+            x2="${jibClew.x}" y2="${jibClew.y}"
+            stroke="#8be0c8"
+            stroke-width="3" />
+
+      <line x1="${jibHead.x}" y1="${jibHead.y}"
+            x2="${jibTack.x}" y2="${jibTack.y}"
+            stroke="rgba(139,224,200,0.85)"
+            stroke-width="2" />
+
+      <circle cx="${mastBase.x}" cy="${mastBase.y}" r="4" fill="#56c2a3"/>
+      <circle cx="${jibTack.x}" cy="${jibTack.y}" r="4" fill="#8be0c8"/>
+
+      <text x="${cx}" y="330"
+            text-anchor="middle"
+            fill="#eaf4f7"
+            font-size="15"
+            font-weight="700">
+        ${config.label}
+      </text>
+
+      <text x="${cx}" y="349"
+            text-anchor="middle"
+            fill="#a9c0c9"
+            font-size="13">
+        ${tackLabel}
+      </text>
+
+      <text x="${cx}" y="367"
+            text-anchor="middle"
+            fill="#a9c0c9"
+            font-size="12">
+        Main ${Math.abs(config.mainAngle)}° • Headsail ${Math.abs(config.jibAngle)}°
+      </text>
     </svg>
   `;
 
@@ -1277,7 +1526,7 @@ function renderResults(recommendation, input) {
     ? recommendation.watchNext.map((item) => `<li>${item}</li>`).join("")
     : "<li>Keep checking helm balance, heel, and sail flow after each change.</li>";
 
-  const diagramConfig = getDiagramConfig(input.pointOfSail);
+  const diagramConfig = getDiagramConfig(input.pointOfSail, input.boatBearing, input.windDirection);
 
   results.innerHTML = `
     <div class="summary-cards">
@@ -1663,6 +1912,60 @@ document.getElementById("resetBtn").addEventListener("click", function () {
 
 document.getElementById("clearScenariosBtn").addEventListener("click", function () {
   clearScenarios();
+});
+
+const liveUpdateIds = [
+  "windTrend",
+  "windSpeed",
+  "gustSpeed",
+  "windDirection",
+  "waveHeight",
+  "waveDirection",
+  "seaState",
+  "heel",
+  "helm",
+  "mainsailSetup",
+  "headsailSetup",
+  "gusty",
+  "boatProfile",
+  "boatBearing"
+];
+
+function updateAdviceLive() {
+  syncPointOfSailFromBearings();
+
+  const input = getFormInput();
+  const validationError = validateInput(input);
+
+  if (validationError) {
+    return;
+  }
+
+  const recommendation = buildRecommendation(input);
+  renderResults(recommendation, input);
+
+  if (!document.getElementById("liveConditionsCard").classList.contains("hidden")) {
+    updateLiveConditionsCard(
+      document.getElementById("liveConditionsPlace").textContent || "Live conditions",
+      document.getElementById("liveConditionsTime").textContent.replace("Forecast time: ", "") || "Current",
+      input.windSpeed,
+      input.gustSpeed,
+      input.windDirection,
+      input.waveHeight,
+      input.waveDirection,
+      input.seaState,
+      input.boatBearing,
+      currentBearingSource
+    );
+  }
+}
+
+liveUpdateIds.forEach((id) => {
+  const el = document.getElementById(id);
+  if (!el) return;
+
+  const eventName = el.type === "checkbox" ? "change" : "input";
+  el.addEventListener(eventName, updateAdviceLive);
 });
 
 renderSavedScenarios();
