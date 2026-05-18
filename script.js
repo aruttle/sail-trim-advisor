@@ -1211,11 +1211,26 @@ function polarPoint(cx, cy, radius, degrees) {
   };
 }
 
+function getPointOfSailArcColor(pointOfSail) {
+  const colors = {
+    in_irons: "#ff6b6b",
+    close_hauled: "#ffd166",
+    close_reach: "#70d6ff",
+    beam_reach: "#7ae582",
+    broad_reach: "#c77dff",
+    run: "#ff9f1c"
+  };
+
+  return colors[pointOfSail] || "#8fd3ff";
+}
+
+
 function renderDiagram(pointOfSail) {
   const boatBearing = Number(document.getElementById("boatBearing").value) || 0;
   const windDirection = Number(document.getElementById("windDirection").value) || 0;
 
   const config = getDiagramConfig(pointOfSail, boatBearing, windDirection);
+  const arcColor = getPointOfSailArcColor(pointOfSail);
   const container = document.getElementById("diagramInner");
   if (!container) return;
 
@@ -1226,8 +1241,6 @@ function renderDiagram(pointOfSail) {
 
   const hullTop = 78;
   const hullBottom = 292;
-  const mastTopY = 126;
-  const mastBaseY = 205;
 
   const boatHeading = normalizeDegrees(boatBearing);
   const windFrom = normalizeDegrees(windDirection);
@@ -1235,11 +1248,9 @@ function renderDiagram(pointOfSail) {
   const relativeWind = ((windFrom - boatHeading) + 360) % 360;
   const onStarboardTack = relativeWind < 180;
 
+  // Wind from starboard => sails to port
+  // Wind from port => sails to starboard
   const sailSideSign = onStarboardTack ? 1 : -1;
-
-  const mainAngle = config.mainAngle * sailSideSign;
-  const jibAngle = config.jibAngle * sailSideSign;
-  const fullness = config.fullness;
 
   function rotatePoint(x, y, cx0, cy0, deg) {
     const rad = deg * Math.PI / 180;
@@ -1257,27 +1268,6 @@ function renderDiagram(pointOfSail) {
       x: cx0 + radius * Math.cos(radians),
       y: cy0 + radius * Math.sin(radians)
     };
-  }
-
-  function offsetControlPoint(a, b, offset, sideSign) {
-    const midX = (a.x + b.x) / 2;
-    const midY = (a.y + b.y) / 2;
-    const dx = b.x - a.x;
-    const dy = b.y - a.y;
-    const len = Math.hypot(dx, dy) || 1;
-
-    const nx = -dy / len;
-    const ny = dx / len;
-
-    return {
-      x: midX + nx * offset * sideSign,
-      y: midY + ny * offset * sideSign
-    };
-  }
-
-  function describeTack() {
-    if (pointOfSail === "in_irons") return "Head to wind";
-    return onStarboardTack ? "Starboard tack" : "Port tack";
   }
 
   function buildAngleArcPath(cx0, cy0, r, startDeg, endDeg) {
@@ -1303,6 +1293,25 @@ function renderDiagram(pointOfSail) {
     return { start: windDeg, end: boatDeg, value: diffCCW };
   }
 
+  function describeTack() {
+    if (pointOfSail === "in_irons") return "Head to wind";
+    return onStarboardTack ? "Starboard tack" : "Port tack";
+  }
+
+  function offsetPoint(a, b, offset, sideSign) {
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const len = Math.hypot(dx, dy) || 1;
+
+    const nx = -dy / len;
+    const ny = dx / len;
+
+    return {
+      x: (a.x + b.x) / 2 + nx * offset * sideSign,
+      y: (a.y + b.y) / 2 + ny * offset * sideSign
+    };
+  }
+
   const hullPointsBase = [
     { x: 180, y: hullTop },
     { x: 204, y: 106 },
@@ -1319,57 +1328,40 @@ function renderDiagram(pointOfSail) {
   const hullPoints = hullPointsBase.map((p) => rotatePoint(p.x, p.y, cx, cy, boatHeading));
   const hullPointsString = hullPoints.map((p) => `${p.x},${p.y}`).join(" ");
 
-  const mastTop = rotatePoint(180, mastTopY, cx, cy, boatHeading);
-  const mastBase = rotatePoint(180, mastBaseY, cx, cy, boatHeading);
+  // Boat geometry anchors
+  const mastBase = rotatePoint(180, 205, cx, cy, boatHeading);
+  const mastTop = rotatePoint(180, 148, cx, cy, boatHeading);
+  const jibTack = rotatePoint(180, 112, cx, cy, boatHeading);
 
-  const boomLength = 88;
-  const jibLength = 72;
-
-  const boomEnd = localPolarPoint(
+  const mainEnd = localPolarPoint(
     mastBase.x,
     mastBase.y,
-    boomLength,
-    boatHeading + 180 + mainAngle
+    82,
+    boatHeading + 180 + (config.mainAngle * sailSideSign)
   );
 
-  const jibHead = rotatePoint(180, 132, cx, cy, boatHeading);
-  const jibTack = rotatePoint(180, 102, cx, cy, boatHeading);
-
-  const jibClew = localPolarPoint(
+  const jibEnd = localPolarPoint(
     jibTack.x,
     jibTack.y,
-    jibLength,
-    boatHeading + 180 + jibAngle
+    102,
+    boatHeading + 180 + (config.jibAngle * sailSideSign)
   );
 
-  const mainCurveControl = offsetControlPoint(
-    mastTop,
-    boomEnd,
-    14 + fullness * 22,
-    onStarboardTack ? 1 : -1
-  );
+  // Smaller bulge upwind, more bulge off the wind
+  const mainCurveDepth = 10 + config.fullness * 18;
+  const jibCurveDepth = 8 + config.fullness * 14;
 
-  const jibCurveControl = offsetControlPoint(
-    jibHead,
-    jibClew,
-    8 + fullness * 12,
-    onStarboardTack ? 1 : -1
-  );
+  const mainControl = offsetPoint(mastBase, mainEnd, mainCurveDepth, sailSideSign);
+  const jibControl = offsetPoint(jibTack, jibEnd, jibCurveDepth, sailSideSign);
 
   const mainPath = `
-    M ${mastTop.x} ${mastTop.y}
-    L ${mastBase.x} ${mastBase.y}
-    L ${boomEnd.x} ${boomEnd.y}
-    Q ${mainCurveControl.x} ${mainCurveControl.y} ${mastTop.x} ${mastTop.y}
-    Z
+    M ${mastBase.x} ${mastBase.y}
+    Q ${mainControl.x} ${mainControl.y} ${mainEnd.x} ${mainEnd.y}
   `;
 
   const jibPath = `
-    M ${jibHead.x} ${jibHead.y}
-    L ${jibTack.x} ${jibTack.y}
-    L ${jibClew.x} ${jibClew.y}
-    Q ${jibCurveControl.x} ${jibCurveControl.y} ${jibHead.x} ${jibHead.y}
-    Z
+    M ${jibTack.x} ${jibTack.y}
+    Q ${jibControl.x} ${jibControl.y} ${jibEnd.x} ${jibEnd.y}
   `;
 
   const headingArrowEnd = localPolarPoint(cx, cy, 138, boatHeading);
@@ -1379,8 +1371,7 @@ function renderDiagram(pointOfSail) {
   const windArrowEnd = localPolarPoint(cx, cy, 82, windFrom);
 
   const arcInfo = getArcDisplayDegrees(boatHeading, windFrom);
-  const arcPath = buildAngleArcPath(cx, cy, 112, arcInfo.start, arcInfo.end);
-
+  const angleArcPath = buildAngleArcPath(cx, cy, 112, arcInfo.start, arcInfo.end);
   const arcMid = localPolarPoint(cx, cy, 124, arcInfo.start + (arcInfo.value / 2));
 
   const labelWind = localPolarPoint(cx, cy, 160, windFrom);
@@ -1389,7 +1380,7 @@ function renderDiagram(pointOfSail) {
   const tackLabel = describeTack();
 
   const svg = `
-    <svg viewBox="0 0 ${width} ${height}" width="100%" height="100%" aria-label="Upgraded sail trim diagram">
+    <svg viewBox="0 0 ${width} ${height}" width="100%" height="100%" aria-label="Sail trim diagram">
       <defs>
         <marker id="windArrowHead" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto">
           <polygon points="0 0, 8 3, 0 6" fill="#8be0c8"></polygon>
@@ -1403,15 +1394,15 @@ function renderDiagram(pointOfSail) {
       <circle cx="${cx}" cy="${cy}" r="112" fill="none" stroke="rgba(255,255,255,0.06)" stroke-dasharray="4 6"/>
       <circle cx="${cx}" cy="${cy}" r="78" fill="none" stroke="rgba(255,255,255,0.04)" stroke-dasharray="4 6"/>
 
-      <path d="${arcPath}"
+      <path d="${angleArcPath}"
             fill="none"
-            stroke="rgba(143, 211, 255, 0.85)"
+            stroke="${arcColor}"
             stroke-width="7"
             stroke-linecap="round" />
 
       <text x="${arcMid.x}" y="${arcMid.y}"
             text-anchor="middle"
-            fill="#8fd3ff"
+            fill="${arcColor}"
             font-size="14"
             font-weight="700">
         ${config.angleOffWind}°
@@ -1451,38 +1442,25 @@ function renderDiagram(pointOfSail) {
                stroke="#0b1720"
                stroke-width="2" />
 
-      <line x1="${mastTop.x}" y1="${mastTop.y}"
-            x2="${mastBase.x}" y2="${mastBase.y}"
-            stroke="#0b1720"
-            stroke-width="4" />
-
+      <!-- Main sail curve -->
       <path d="${mainPath}"
-            fill="rgba(86,194,163,0.34)"
-            stroke="#56c2a3"
-            stroke-width="2" />
+            fill="none"
+            stroke="#55a630"
+            stroke-width="6"
+            stroke-linecap="round" />
 
+      <!-- Headsail curve -->
       <path d="${jibPath}"
-            fill="rgba(139,224,200,0.22)"
-            stroke="#8be0c8"
-            stroke-width="2" />
+            fill="none"
+            stroke="#74b816"
+            stroke-width="6"
+            stroke-linecap="round" />
 
-      <line x1="${mastBase.x}" y1="${mastBase.y}"
-            x2="${boomEnd.x}" y2="${boomEnd.y}"
-            stroke="#56c2a3"
-            stroke-width="3" />
+      <circle cx="${mastBase.x}" cy="${mastBase.y}" r="4.5" fill="#1c7ed6" />
+      
 
-      <line x1="${jibTack.x}" y1="${jibTack.y}"
-            x2="${jibClew.x}" y2="${jibClew.y}"
-            stroke="#8be0c8"
-            stroke-width="3" />
-
-      <line x1="${jibHead.x}" y1="${jibHead.y}"
-            x2="${jibTack.x}" y2="${jibTack.y}"
-            stroke="rgba(139,224,200,0.85)"
-            stroke-width="2" />
-
-      <circle cx="${mastBase.x}" cy="${mastBase.y}" r="4" fill="#56c2a3"/>
-      <circle cx="${jibTack.x}" cy="${jibTack.y}" r="4" fill="#8be0c8"/>
+      <circle cx="${jibTack.x}" cy="${jibTack.y}" r="4.5" fill="#1c7ed6" />
+      
 
       <text x="${cx}" y="330"
             text-anchor="middle"
