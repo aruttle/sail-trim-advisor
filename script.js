@@ -89,6 +89,29 @@ const pointOfSailProfiles = {
   }
 };
 
+function $(id) {
+  return document.getElementById(id);
+}
+
+function getGustSpeedInputElement() {
+  return $("gustSpeed") || $("gustSpeedInput");
+}
+
+function getGustSpeedValue() {
+  const el = getGustSpeedInputElement();
+  return Number(el?.value ?? 0);
+}
+
+function setGustSpeedValue(value) {
+  const el = getGustSpeedInputElement();
+  if (el) el.value = value;
+}
+
+function safeAddListener(id, eventName, handler) {
+  const el = $(id);
+  if (el) el.addEventListener(eventName, handler);
+}
+
 function isInIrons(pointOfSail) {
   return pointOfSail === "in_irons";
 }
@@ -118,42 +141,6 @@ function getAngleOffWind(boatBearing, windDirection) {
   return Math.round(smallestAngleDifference(boatBearing, windDirection));
 }
 
-function updatePointOfSailAngleDisplay() {
-  const boatBearing = Number(document.getElementById("boatBearing").value);
-  const windDirection = Number(document.getElementById("windDirection").value);
-  const angleField = document.getElementById("pointOfSailAngle");
-
-  if (Number.isNaN(boatBearing) || Number.isNaN(windDirection)) {
-    angleField.value = "--";
-    return;
-  }
-
-  angleField.value = `${getAngleOffWind(boatBearing, windDirection)}°`;
-}
-
-function getPointOfSailFromBearings(boatBearing, windDirection) {
-  const angle = smallestAngleDifference(boatBearing, windDirection);
-
-  if (angle <= 14) return "in_irons";
-  if (angle < 45) return "close_hauled";
-  if (angle < 70) return "close_reach";
-  if (angle < 110) return "beam_reach";
-  if (angle < 160) return "broad_reach";
-  return "run";
-}
-
-function syncPointOfSailFromBearings() {
-  const boatBearing = Number(document.getElementById("boatBearing").value);
-  const windDirection = Number(document.getElementById("windDirection").value);
-
-  updatePointOfSailAngleDisplay();
-
-  if (Number.isNaN(boatBearing) || Number.isNaN(windDirection)) return;
-
-  const pointOfSail = getPointOfSailFromBearings(boatBearing, windDirection);
-  document.getElementById("pointOfSail").value = pointOfSail;
-}
-
 function degreesToCompass(deg) {
   const dirs = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"];
   const normalized = normalizeDegrees(deg);
@@ -167,9 +154,7 @@ function formatDirection(deg) {
 }
 
 function titleCase(text) {
-  return text
-    .replaceAll("_", " ")
-    .replace(/\b\w/g, (char) => char.toUpperCase());
+  return text.replaceAll("_", " ").replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
 function createAction(priority, control, action, detail) {
@@ -177,14 +162,16 @@ function createAction(priority, control, action, detail) {
 }
 
 function clearFormError() {
-  const existing = document.getElementById("formError");
+  const existing = $("formError");
   if (existing) existing.remove();
 }
 
 function showFormError(message) {
   clearFormError();
-  const form = document.getElementById("trimForm");
-  const actions = form.querySelector(".actions");
+  const form = $("trimForm");
+  const actions = form?.querySelector(".actions");
+  if (!form || !actions) return;
+
   const error = document.createElement("div");
   error.id = "formError";
   error.className = "form-error";
@@ -193,32 +180,34 @@ function showFormError(message) {
 }
 
 function setLocationStatus(message) {
-  document.getElementById("locationStatus").textContent = message;
+  if ($("locationStatus")) $("locationStatus").textContent = message;
 }
 
 function setBearingStatus(message) {
-  document.getElementById("bearingStatus").textContent = message;
+  if ($("bearingStatus")) $("bearingStatus").textContent = message;
 }
 
 function hideLiveConditionsCard() {
-  document.getElementById("liveConditionsCard").classList.add("hidden");
-  const compass = document.getElementById("liveDirectionCompass");
+  $("liveConditionsCard")?.classList.add("hidden");
+  const compass = $("liveDirectionCompass");
   if (compass) compass.innerHTML = "";
 }
 
 function showLiveConditionsCard() {
-  document.getElementById("liveConditionsCard").classList.remove("hidden");
+  $("liveConditionsCard")?.classList.remove("hidden");
 }
 
 function hideLocationSuggestions() {
-  const box = document.getElementById("locationSuggestions");
+  const box = $("locationSuggestions");
+  if (!box) return;
   box.classList.add("hidden");
   box.innerHTML = "";
   currentLocationSuggestions = [];
 }
 
 function renderLocationSuggestions(results) {
-  const box = document.getElementById("locationSuggestions");
+  const box = $("locationSuggestions");
+  if (!box) return;
 
   if (!results.length) {
     hideLocationSuggestions();
@@ -258,8 +247,7 @@ async function fetchLocationSuggestions(query) {
     }
 
     const data = await response.json();
-    const results = data.results || [];
-    renderLocationSuggestions(results);
+    renderLocationSuggestions(data.results || []);
   } catch {
     hideLocationSuggestions();
   }
@@ -268,10 +256,9 @@ async function fetchLocationSuggestions(query) {
 async function applyLocationSuggestion(place) {
   const display = [place.name, place.admin1, place.country].filter(Boolean).join(", ");
   selectedLocation = place;
-  document.getElementById("locationQuery").value = display;
+  if ($("locationQuery")) $("locationQuery").value = display;
   hideLocationSuggestions();
   setLocationStatus(`Selected location: ${display}`);
-
   await fetchLiveConditions();
 }
 
@@ -325,17 +312,19 @@ function validateInput(input) {
     Number.isNaN(input.windDirection) ||
     Number.isNaN(input.waveHeight) ||
     Number.isNaN(input.waveDirection) ||
-    Number.isNaN(input.boatBearing)
+    Number.isNaN(input.boatBearing) ||
+    Number.isNaN(input.boatSpeed)
   ) {
-    return "Please complete all wind, wave, and bearing values.";
+    return "Please complete all wind, wave, speed, and bearing values.";
   }
 
   if (
     input.windSpeed < 0 ||
     input.gustSpeed < 0 ||
-    input.waveHeight < 0
+    input.waveHeight < 0 ||
+    input.boatSpeed < 0
   ) {
-    return "Wind and wave values cannot be negative.";
+    return "Wind, wave, and boat speed values cannot be negative.";
   }
 
   if (input.gustSpeed < input.windSpeed) {
@@ -441,21 +430,115 @@ function polarArrowPoint(cx, cy, radius, degrees) {
   };
 }
 
-function renderLiveCompass(windDirection, waveDirection, boatBearing) {
-  const container = document.getElementById("liveDirectionCompass");
+function bearingToVector(speed, directionFromDeg) {
+  const directionToDeg = normalizeDegrees(directionFromDeg + 180);
+  const rad = directionToDeg * Math.PI / 180;
+  return {
+    x: speed * Math.sin(rad),
+    y: speed * Math.cos(rad)
+  };
+}
+
+function headingToVector(speed, headingDeg) {
+  const rad = normalizeDegrees(headingDeg) * Math.PI / 180;
+  return {
+    x: speed * Math.sin(rad),
+    y: speed * Math.cos(rad)
+  };
+}
+
+function vectorToBearingTo(x, y) {
+  const deg = Math.atan2(x, y) * 180 / Math.PI;
+  return normalizeDegrees(deg);
+}
+
+function getApparentWindData(trueWindSpeed, trueWindDirection, boatSpeed, boatHeading) {
+  const trueWindVec = bearingToVector(trueWindSpeed, trueWindDirection);
+  const boatVec = headingToVector(boatSpeed, boatHeading);
+
+  const apparentVec = {
+    x: trueWindVec.x - boatVec.x,
+    y: trueWindVec.y - boatVec.y
+  };
+
+  const apparentSpeed = Math.hypot(apparentVec.x, apparentVec.y);
+  const apparentToBearing = vectorToBearingTo(apparentVec.x, apparentVec.y);
+  const apparentFromBearing = normalizeDegrees(apparentToBearing + 180);
+  const apparentAngleOffBow = smallestAngleDifference(boatHeading, apparentFromBearing);
+
+  return {
+    speed: apparentSpeed,
+    direction: apparentFromBearing,
+    angleOffBow: apparentAngleOffBow
+  };
+}
+
+function getPointOfSailFromAngle(angle) {
+  if (angle <= 14) return "in_irons";
+  if (angle < 45) return "close_hauled";
+  if (angle < 70) return "close_reach";
+  if (angle < 110) return "beam_reach";
+  if (angle < 160) return "broad_reach";
+  return "run";
+}
+
+function getPointOfSailFromBearings(boatBearing, windDirection) {
+  return getPointOfSailFromAngle(smallestAngleDifference(boatBearing, windDirection));
+}
+
+function updatePointOfSailAngleDisplay() {
+  const boatBearing = Number($("boatBearing")?.value);
+  const windDirection = Number($("windDirection")?.value);
+  const angleField = $("pointOfSailAngle");
+
+  if (!angleField) return;
+
+  if (Number.isNaN(boatBearing) || Number.isNaN(windDirection)) {
+    angleField.value = "--";
+    return;
+  }
+
+  const apparent = getApparentWindData(
+    Number($("windSpeed")?.value || 0),
+    windDirection,
+    Number($("boatSpeed")?.value || 0),
+    boatBearing
+  );
+
+  angleField.value = `${Math.round(apparent.angleOffBow)}°`;
+}
+
+function syncPointOfSailFromBearings() {
+  const boatBearing = Number($("boatBearing")?.value);
+  const windDirection = Number($("windDirection")?.value);
+  const windSpeed = Number($("windSpeed")?.value || 0);
+  const boatSpeed = Number($("boatSpeed")?.value || 0);
+
+  updatePointOfSailAngleDisplay();
+
+  if (Number.isNaN(boatBearing) || Number.isNaN(windDirection)) return;
+
+  const apparent = getApparentWindData(windSpeed, windDirection, boatSpeed, boatBearing);
+  const pointOfSail = getPointOfSailFromAngle(apparent.angleOffBow);
+
+  if ($("pointOfSail")) $("pointOfSail").value = pointOfSail;
+}
+
+function renderLiveCompass(apparentWindDirection, waveDirection, boatBearing) {
+  const container = $("liveDirectionCompass");
   if (!container) return;
 
   const cx = 130;
   const cy = 120;
-  const windEnd = polarArrowPoint(cx, cy, 84, windDirection);
+  const apparentWindEnd = polarArrowPoint(cx, cy, 84, apparentWindDirection);
   const waveEnd = polarArrowPoint(cx, cy, 68, waveDirection);
   const boatEnd = polarArrowPoint(cx, cy, 52, boatBearing);
 
   const svg = `
-    <svg class="compass-svg" viewBox="0 0 260 300" aria-label="Wind, wave, and boat direction compass">
+    <svg class="compass-svg" viewBox="0 0 260 300" aria-label="Apparent wind, wave, and boat direction compass">
       <defs>
-        <marker id="windCompassArrow" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto">
-          <polygon points="0 0, 8 3, 0 6" fill="#8be0c8"></polygon>
+        <marker id="appWindCompassArrow" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#70d6ff"></polygon>
         </marker>
         <marker id="waveCompassArrow" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto">
           <polygon points="0 0, 8 3, 0 6" fill="#8fd3ff"></polygon>
@@ -474,8 +557,8 @@ function renderLiveCompass(windDirection, waveDirection, boatBearing) {
       <text x="12" y="124" fill="#eaf4f7" font-size="13" font-weight="700">W</text>
       <text x="236" y="124" fill="#eaf4f7" font-size="13" font-weight="700">E</text>
 
-      <line x1="${cx}" y1="${cy}" x2="${windEnd.x}" y2="${windEnd.y}"
-            stroke="#8be0c8" stroke-width="4" marker-end="url(#windCompassArrow)" />
+      <line x1="${cx}" y1="${cy}" x2="${apparentWindEnd.x}" y2="${apparentWindEnd.y}"
+            stroke="#70d6ff" stroke-width="4" marker-end="url(#appWindCompassArrow)" />
       <line x1="${cx}" y1="${cy}" x2="${waveEnd.x}" y2="${waveEnd.y}"
             stroke="#8fd3ff" stroke-width="4" marker-end="url(#waveCompassArrow)" />
       <line x1="${cx}" y1="${cy}" x2="${boatEnd.x}" y2="${boatEnd.y}"
@@ -484,7 +567,7 @@ function renderLiveCompass(windDirection, waveDirection, boatBearing) {
       <circle cx="${cx}" cy="${cy}" r="4" fill="#eaf4f7" />
 
       <text x="130" y="270" text-anchor="middle" fill="#a9c0c9" font-size="12">
-        Wind ${formatDirection(windDirection)}
+        Apparent ${formatDirection(apparentWindDirection)}
       </text>
       <text x="130" y="286" text-anchor="middle" fill="#a9c0c9" font-size="12">
         Wave ${formatDirection(waveDirection)} • Boat ${formatDirection(boatBearing)}
@@ -492,7 +575,7 @@ function renderLiveCompass(windDirection, waveDirection, boatBearing) {
     </svg>
 
     <div class="compass-key">
-      <span class="compass-key-item"><span class="compass-dot wind"></span>Wind</span>
+      <span class="compass-key-item"><span class="compass-dot wind"></span>Apparent</span>
       <span class="compass-key-item"><span class="compass-dot wave"></span>Wave</span>
       <span class="compass-key-item"><span class="compass-dot boat"></span>Boat</span>
     </div>
@@ -501,24 +584,38 @@ function renderLiveCompass(windDirection, waveDirection, boatBearing) {
   container.innerHTML = svg;
 }
 
-function updateLiveConditionsCard(placeText, timeText, windSpeed, gustSpeed, windDirection, waveHeight, waveDirection, seaState, boatBearing, bearingSource) {
+function updateLiveConditionsCard(placeText, timeText, windSpeed, gustSpeed, windDirection, waveHeight, waveDirection, seaState, boatBearing, bearingSource, boatSpeed = 0) {
   const seaRelationship = getSeaRelationship(windDirection, waveDirection);
   const seaAngle = getSeaAngleOnBoat(boatBearing, waveDirection);
+  const apparent = getApparentWindData(windSpeed, windDirection, boatSpeed, boatBearing);
 
-  document.getElementById("liveConditionsPlace").textContent = placeText;
-  document.getElementById("liveWindSpeed").textContent = `${windSpeed} kt`;
-  document.getElementById("liveGustSpeed").textContent = `${gustSpeed} kt`;
-  document.getElementById("liveWindDirection").textContent = formatDirection(windDirection);
-  document.getElementById("liveWaveHeight").textContent = `${waveHeight.toFixed(1)} m`;
-  document.getElementById("liveWaveDirection").textContent = formatDirection(waveDirection);
-  document.getElementById("liveSeaState").textContent = describeSeaState(seaState);
-  document.getElementById("liveBoatBearing").textContent = formatDirection(boatBearing);
-  document.getElementById("liveBearingSource").textContent = `Source: ${getBearingSourceLabel(bearingSource)}`;
-  document.getElementById("liveSeaRelationship").textContent = seaRelationship;
-  document.getElementById("liveSeaAngle").textContent = seaAngle;
-  document.getElementById("liveConditionsTime").textContent = `Forecast time: ${timeText}`;
+  const setText = (id, value) => {
+    const el = $(id);
+    if (el) el.textContent = value;
+  };
 
-  renderLiveCompass(windDirection, waveDirection, boatBearing);
+  setText("liveConditionsPlace", placeText);
+  setText("liveConditionsTime", `Forecast time: ${timeText}`);
+
+  setText("liveTrueWindSpeed", `${windSpeed} kt`);
+  setText("liveTrueWindDirection", formatDirection(windDirection));
+  setText("liveGustSpeed", `Gusts: ${gustSpeed} kt`);
+
+  setText("liveApparentWindSpeed", `${apparent.speed.toFixed(1)} kt`);
+  setText("liveApparentWindDirection", formatDirection(apparent.direction));
+  setText("liveApparentWindAngle", `${Math.round(apparent.angleOffBow)}° off bow`);
+
+  setText("liveWaveHeight", `${waveHeight.toFixed(1)} m`);
+  setText("liveWaveDirection", formatDirection(waveDirection));
+  setText("liveSeaState", describeSeaState(seaState));
+
+  setText("liveBoatBearing", formatDirection(boatBearing));
+  setText("liveBearingSource", `Source: ${getBearingSourceLabel(bearingSource)}`);
+
+  setText("liveSeaRelationship", seaRelationship);
+  setText("liveSeaAngle", seaAngle);
+
+  renderLiveCompass(apparent.direction, waveDirection, boatBearing);
   showLiveConditionsCard();
 }
 
@@ -610,7 +707,9 @@ function requestGpsCourseBearing() {
 }
 
 async function detectBoatBearing() {
-  const button = document.getElementById("detectBearingBtn");
+  const button = $("detectBearingBtn");
+  if (!button) return;
+
   button.disabled = true;
   clearFormError();
   setBearingStatus("Detecting bearing...");
@@ -624,7 +723,7 @@ async function detectBoatBearing() {
       result = await requestGpsCourseBearing();
     }
 
-    document.getElementById("boatBearing").value = Math.round(result.heading);
+    if ($("boatBearing")) $("boatBearing").value = Math.round(result.heading);
     currentBearingSource = result.source;
     syncPointOfSailFromBearings();
     setBearingStatus(`Bearing source: ${getBearingSourceLabel(result.source)} (${formatDirection(result.heading)}).`);
@@ -638,8 +737,8 @@ async function detectBoatBearing() {
 }
 
 async function fetchLiveConditions() {
-  const button = document.getElementById("fetchConditionsBtn");
-  const query = document.getElementById("locationQuery").value.trim();
+  const button = $("fetchConditionsBtn");
+  const query = $("locationQuery")?.value.trim();
 
   if (!query) {
     showFormError("Please enter a location before fetching conditions.");
@@ -647,7 +746,7 @@ async function fetchLiveConditions() {
   }
 
   clearFormError();
-  button.disabled = true;
+  if (button) button.disabled = true;
   setLocationStatus("Searching location and fetching live forecast...");
 
   try {
@@ -655,7 +754,7 @@ async function fetchLiveConditions() {
 
     if (
       selectedLocation &&
-      document.getElementById("locationQuery").value.trim() ===
+      $("locationQuery")?.value.trim() ===
         [selectedLocation.name, selectedLocation.admin1, selectedLocation.country].filter(Boolean).join(", ")
     ) {
       location = selectedLocation;
@@ -682,21 +781,21 @@ async function fetchLiveConditions() {
     const seaState = estimateSeaStateFromLiveData(steadyWind, waveHeight);
     const gustSpread = getGustSpread(steadyWind, correctedGust);
 
-    document.getElementById("windSpeed").value = steadyWind;
-    document.getElementById("gustSpeed").value = correctedGust;
-    document.getElementById("windDirection").value = windDirection;
-    document.getElementById("waveHeight").value = waveHeight.toFixed(1);
-    document.getElementById("waveDirection").value = waveDirection;
-    document.getElementById("seaState").value = seaState;
-    document.getElementById("windTrend").value = estimateWindTrend(forecast.hourly.wind_speed_10m, weatherIndex);
-    document.getElementById("gusty").checked = gustSpread >= 4;
+    if ($("windSpeed")) $("windSpeed").value = steadyWind;
+    setGustSpeedValue(correctedGust);
+    if ($("windDirection")) $("windDirection").value = windDirection;
+    if ($("waveHeight")) $("waveHeight").value = waveHeight.toFixed(1);
+    if ($("waveDirection")) $("waveDirection").value = waveDirection;
+    if ($("seaState")) $("seaState").value = seaState;
+    if ($("windTrend")) $("windTrend").value = estimateWindTrend(forecast.hourly.wind_speed_10m, weatherIndex);
+    if ($("gusty")) $("gusty").checked = gustSpread >= 4;
 
     syncPointOfSailFromBearings();
 
-    const placeParts = [location.name, location.admin1, location.country].filter(Boolean);
-    const placeText = placeParts.join(", ");
+    const placeText = [location.name, location.admin1, location.country].filter(Boolean).join(", ");
     const timeText = forecast.hourly.time[weatherIndex];
-    const boatBearing = Number(document.getElementById("boatBearing").value) || 0;
+    const boatBearing = Number($("boatBearing")?.value) || 0;
+    const boatSpeed = Number($("boatSpeed")?.value || 0);
 
     setLocationStatus(`Live forecast loaded for ${placeText}.`);
     updateLiveConditionsCard(
@@ -709,14 +808,15 @@ async function fetchLiveConditions() {
       waveDirection,
       seaState,
       boatBearing,
-      currentBearingSource
+      currentBearingSource,
+      boatSpeed
     );
   } catch (error) {
     showFormError(error.message || "Could not fetch live conditions.");
     setLocationStatus("No live location selected yet.");
     hideLiveConditionsCard();
   } finally {
-    button.disabled = false;
+    if (button) button.disabled = false;
   }
 }
 
@@ -1022,20 +1122,36 @@ function sortAndDeduplicate(actions) {
 }
 
 function buildRecommendation(input) {
-  const profile = pointOfSailProfiles[input.pointOfSail];
+  const apparent = getApparentWindData(
+    input.windSpeed,
+    input.windDirection,
+    input.boatSpeed,
+    input.boatBearing
+  );
+
+  const apparentPointOfSail = getPointOfSailFromAngle(apparent.angleOffBow);
+  const profile = pointOfSailProfiles[apparentPointOfSail];
   const boatProfile = boatProfiles[input.boatProfile];
-  const windBand = getWindBand(input.windSpeed);
+  const windBand = getWindBand(apparent.speed);
   const gustSpread = getGustSpread(input.windSpeed, input.gustSpeed);
-  const urgency = getUrgency(input, windBand);
+  const urgency = getUrgency({ ...input, pointOfSail: apparentPointOfSail }, windBand);
   const seaRelationship = getSeaRelationship(input.windDirection, input.waveDirection);
   const seaAngle = getSeaAngleOnBoat(input.boatBearing, input.waveDirection);
 
+  const adjustedInput = {
+    ...input,
+    pointOfSail: apparentPointOfSail,
+    apparentWindSpeed: apparent.speed,
+    apparentWindDirection: apparent.direction,
+    apparentWindAngle: apparent.angleOffBow
+  };
+
   const actions = sortAndDeduplicate([
-    ...getBaseActions(input),
-    ...getWindActions(input, windBand),
-    ...getSymptomActions(input, windBand),
-    ...getSailPlanActions(input, windBand),
-    ...getBoatProfileActions(input, windBand)
+    ...getBaseActions(adjustedInput),
+    ...getWindActions(adjustedInput, windBand),
+    ...getSymptomActions(adjustedInput, windBand),
+    ...getSailPlanActions(adjustedInput, windBand),
+    ...getBoatProfileActions(adjustedInput, windBand)
   ]);
 
   const reasoning = [
@@ -1043,19 +1159,22 @@ function buildRecommendation(input) {
     `Base trim: ${profile.main} ${profile.headsail}`,
     `Shape target: ${profile.sailShape}`,
     `Kicker note: ${profile.kicker}`,
-    `Live wind direction: ${formatDirection(input.windDirection)}.`,
+    `True wind direction: ${formatDirection(input.windDirection)}.`,
+    `Apparent wind direction: ${formatDirection(apparent.direction)}.`,
+    `Apparent wind speed: ${apparent.speed.toFixed(1)} kt.`,
+    `Apparent wind angle: ${Math.round(apparent.angleOffBow)}°.`,
+    `Boat speed: ${input.boatSpeed.toFixed(1)} kt.`,
     `Wave direction: ${formatDirection(input.waveDirection)}.`,
     `Wave height: ${input.waveHeight.toFixed(1)} m.`,
     `Boat bearing: ${formatDirection(input.boatBearing)}.`,
-    `Angle off the wind: ${getAngleOffWind(input.boatBearing, input.windDirection)}°.`,
     `Sea relationship: ${seaRelationship}.`,
     `Sea on boat: ${seaAngle}.`
   ];
 
-  if (windBand === "light") reasoning.push("Wind strength is light, so preserve power and avoid over-flattening.");
-  if (windBand === "moderate") reasoning.push("Wind strength is moderate, so aim for balanced power and clean flow.");
-  if (windBand === "fresh") reasoning.push("Wind strength is fresh, so depowering and balance move higher up the ladder.");
-  if (windBand === "strong") reasoning.push("Wind strength is strong, so control, reefing, and reduced heel take priority.");
+  if (windBand === "light") reasoning.push("Apparent wind strength is light, so preserve power and avoid over-flattening.");
+  if (windBand === "moderate") reasoning.push("Apparent wind strength is moderate, so aim for balanced power and clean flow.");
+  if (windBand === "fresh") reasoning.push("Apparent wind strength is fresh, so depowering and balance move higher up the ladder.");
+  if (windBand === "strong") reasoning.push("Apparent wind strength is strong, so control, reefing, and reduced heel take priority.");
 
   if (gustSpread >= 4) {
     reasoning.push(`Gust spread is ${gustSpread} kt, so the boat will need more active trimming through gusts.`);
@@ -1069,8 +1188,8 @@ function buildRecommendation(input) {
     reasoning.push("Sea state is rough enough that speed and control matter more than chasing angle.");
   }
 
-  if (isInIrons(input.pointOfSail)) {
-    reasoning.push("The boat is effectively too close to head-to-wind to generate proper sail drive.");
+  if (isInIrons(apparentPointOfSail)) {
+    reasoning.push("The boat is effectively too close to the apparent wind to generate proper sail drive.");
     reasoning.push("Recovery comes before trim. Bear away, rebuild flow, then trim once steerage returns.");
   }
 
@@ -1082,7 +1201,8 @@ function buildRecommendation(input) {
     urgency,
     actions,
     reasoning,
-    watchNext: getWatchNext(input, windBand)
+    watchNext: getWatchNext(adjustedInput, windBand),
+    apparent
   };
 }
 
@@ -1100,11 +1220,13 @@ function renderActionCards(actions) {
 }
 
 function renderNoteCards(recommendation, input) {
+  const apparent = recommendation.apparent;
+
   return `
     <div class="note-grid">
       <div class="note-card">
-        <h4>Point of sail angle</h4>
-        <p>${getAngleOffWind(input.boatBearing, input.windDirection)}° off the wind.</p>
+        <h4>Apparent wind angle</h4>
+        <p>${Math.round(apparent.angleOffBow)}° off the bow.</p>
       </div>
       <div class="note-card">
         <h4>Main trim</h4>
@@ -1123,16 +1245,20 @@ function renderNoteCards(recommendation, input) {
         <p>${recommendation.profile.kicker}</p>
       </div>
       <div class="note-card">
-        <h4>Wind direction</h4>
-        <p>${formatDirection(input.windDirection)}</p>
+        <h4>True wind</h4>
+        <p>${input.windSpeed} kt from ${formatDirection(input.windDirection)}</p>
+      </div>
+      <div class="note-card">
+        <h4>Apparent wind</h4>
+        <p>${apparent.speed.toFixed(1)} kt from ${formatDirection(apparent.direction)}</p>
+      </div>
+      <div class="note-card">
+        <h4>Boat speed / bearing</h4>
+        <p>${input.boatSpeed.toFixed(1)} kt on ${formatDirection(input.boatBearing)} (${getBearingSourceLabel(currentBearingSource)})</p>
       </div>
       <div class="note-card">
         <h4>Wave picture</h4>
         <p>${input.waveHeight.toFixed(1)} m from ${formatDirection(input.waveDirection)}. Sea state: ${describeSeaState(input.seaState)}.</p>
-      </div>
-      <div class="note-card">
-        <h4>Boat bearing</h4>
-        <p>${formatDirection(input.boatBearing)} (${getBearingSourceLabel(currentBearingSource)})</p>
       </div>
       <div class="note-card">
         <h4>Sea relationship</h4>
@@ -1143,9 +1269,12 @@ function renderNoteCards(recommendation, input) {
 }
 
 function getDiagramConfig(pointOfSail, boatBearing, windDirection) {
-  const angleOffWind = getAngleOffWind(boatBearing, windDirection);
+  const windSpeed = Number($("windSpeed")?.value || 0);
+  const boatSpeed = Number($("boatSpeed")?.value || 0);
+  const apparent = getApparentWindData(windSpeed, windDirection, boatSpeed, boatBearing);
+  const angleOffWind = Math.round(apparent.angleOffBow);
 
-  const relativeWind = ((normalizeDegrees(windDirection) - normalizeDegrees(boatBearing)) + 360) % 360;
+  const relativeWind = ((normalizeDegrees(apparent.direction) - normalizeDegrees(boatBearing)) + 360) % 360;
   const tackSide = relativeWind < 180 ? "starboard" : "port";
 
   const configs = {
@@ -1153,61 +1282,80 @@ function getDiagramConfig(pointOfSail, boatBearing, windDirection) {
       label: "In Irons",
       mainAngle: 8,
       jibAngle: 6,
-      fullness: 0.18,
-      caption: "The boat is too close to head-to-wind to generate proper drive. Recover steerage first."
+      fullness: 0.12,
+      mainLength: 34,
+      jibLength: 28,
+      mainDepth: 6,
+      jibDepth: 5,
+      caption: "The boat is too close to the apparent wind to generate proper drive. Recover steerage first."
     },
     close_hauled: {
       label: "Close-hauled",
       mainAngle: 18,
       jibAngle: 14,
-      fullness: 0.2,
+      fullness: 0.18,
+      mainLength: 68,
+      jibLength: 58,
+      mainDepth: 9,
+      jibDepth: 8,
       caption: "Sails are trimmed tight, fairly flat, and set for height with control."
     },
     close_reach: {
       label: "Close reach",
       mainAngle: 32,
       jibAngle: 24,
-      fullness: 0.28,
+      fullness: 0.26,
+      mainLength: 78,
+      jibLength: 72,
+      mainDepth: 13,
+      jibDepth: 11,
       caption: "Main and headsail are eased a little for fast, efficient power."
     },
     beam_reach: {
       label: "Beam reach",
       mainAngle: 58,
       jibAngle: 45,
-      fullness: 0.38,
+      fullness: 0.36,
+      mainLength: 90,
+      jibLength: 88,
+      mainDepth: 18,
+      jibDepth: 15,
       caption: "A powerful reaching setup with more open trim and stronger vang importance."
     },
     broad_reach: {
       label: "Broad reach",
       mainAngle: 78,
       jibAngle: 66,
-      fullness: 0.5,
+      fullness: 0.46,
+      mainLength: 98,
+      jibLength: 100,
+      mainDepth: 22,
+      jibDepth: 18,
       caption: "Sails are opened well out and carried fuller for controlled drive."
     },
     run: {
       label: "Run",
       mainAngle: 92,
       jibAngle: 86,
-      fullness: 0.58,
+      fullness: 0.54,
+      mainLength: 104,
+      jibLength: 108,
+      mainDepth: 24,
+      jibDepth: 20,
       caption: "Deep downwind trim. Stability matters more than elegance."
     }
   };
 
-  const base = configs[pointOfSail] || configs.close_hauled;
+  const apparentPointOfSail = getPointOfSailFromAngle(angleOffWind);
+  const base = configs[apparentPointOfSail] || configs.close_hauled;
 
   return {
     ...base,
     angleOffWind,
     tackSide,
-    relativeWind
-  };
-}
-
-function polarPoint(cx, cy, radius, degrees) {
-  const radians = (degrees - 90) * Math.PI / 180;
-  return {
-    x: cx + radius * Math.cos(radians),
-    y: cy + radius * Math.sin(radians)
+    relativeWind,
+    apparentWindDirection: apparent.direction,
+    apparentPointOfSail
   };
 }
 
@@ -1224,18 +1372,22 @@ function getPointOfSailArcColor(pointOfSail) {
   return colors[pointOfSail] || "#8fd3ff";
 }
 
-
 function renderDiagram(pointOfSail) {
-  const boatBearing = Number(document.getElementById("boatBearing").value) || 0;
-  const windDirection = Number(document.getElementById("windDirection").value) || 0;
+  const boatBearing = Number($("boatBearing")?.value) || 0;
+  const trueWindDirection = Number($("windDirection")?.value) || 0;
+  const trueWindSpeed = Number($("windSpeed")?.value || 0);
+  const boatSpeed = Number($("boatSpeed")?.value || 0);
 
-  const config = getDiagramConfig(pointOfSail, boatBearing, windDirection);
-  const arcColor = getPointOfSailArcColor(pointOfSail);
-  const container = document.getElementById("diagramInner");
+  const apparent = getApparentWindData(trueWindSpeed, trueWindDirection, boatSpeed, boatBearing);
+  const apparentPointOfSail = getPointOfSailFromAngle(apparent.angleOffBow);
+
+  const config = getDiagramConfig(apparentPointOfSail, boatBearing, trueWindDirection);
+  const arcColor = getPointOfSailArcColor(apparentPointOfSail);
+  const container = $("diagramInner");
   if (!container) return;
 
   const width = 360;
-  const height = 380;
+  const height = 390;
   const cx = 180;
   const cy = 180;
 
@@ -1243,13 +1395,11 @@ function renderDiagram(pointOfSail) {
   const hullBottom = 292;
 
   const boatHeading = normalizeDegrees(boatBearing);
-  const windFrom = normalizeDegrees(windDirection);
+  const windFromTrue = normalizeDegrees(trueWindDirection);
+  const windFromApparent = normalizeDegrees(apparent.direction);
 
-  const relativeWind = ((windFrom - boatHeading) + 360) % 360;
+  const relativeWind = ((windFromApparent - boatHeading) + 360) % 360;
   const onStarboardTack = relativeWind < 180;
-
-  // Wind from starboard => sails to port
-  // Wind from port => sails to starboard
   const sailSideSign = onStarboardTack ? 1 : -1;
 
   function rotatePoint(x, y, cx0, cy0, deg) {
@@ -1278,7 +1428,6 @@ function renderDiagram(pointOfSail) {
     if (sweep < 0) sweep += 360;
 
     const largeArc = sweep > 180 ? 1 : 0;
-
     return `M ${start.x} ${start.y} A ${r} ${r} 0 ${largeArc} 1 ${end.x} ${end.y}`;
   }
 
@@ -1294,7 +1443,7 @@ function renderDiagram(pointOfSail) {
   }
 
   function describeTack() {
-    if (pointOfSail === "in_irons") return "Head to wind";
+    if (apparentPointOfSail === "in_irons") return "Head to wind";
     return onStarboardTack ? "Starboard tack" : "Port tack";
   }
 
@@ -1328,53 +1477,51 @@ function renderDiagram(pointOfSail) {
   const hullPoints = hullPointsBase.map((p) => rotatePoint(p.x, p.y, cx, cy, boatHeading));
   const hullPointsString = hullPoints.map((p) => `${p.x},${p.y}`).join(" ");
 
-  // Boat geometry anchors
-  const mastBase = rotatePoint(180, 205, cx, cy, boatHeading);
-  const mastTop = rotatePoint(180, 148, cx, cy, boatHeading);
-  const jibTack = rotatePoint(180, 112, cx, cy, boatHeading);
+  const mainAnchor = rotatePoint(180, 200, cx, cy, boatHeading);
+  const jibAnchor = rotatePoint(180, 118, cx, cy, boatHeading);
 
   const mainEnd = localPolarPoint(
-    mastBase.x,
-    mastBase.y,
-    82,
+    mainAnchor.x,
+    mainAnchor.y,
+    config.mainLength,
     boatHeading + 180 + (config.mainAngle * sailSideSign)
   );
 
   const jibEnd = localPolarPoint(
-    jibTack.x,
-    jibTack.y,
-    102,
+    jibAnchor.x,
+    jibAnchor.y,
+    config.jibLength,
     boatHeading + 180 + (config.jibAngle * sailSideSign)
   );
 
-  // Smaller bulge upwind, more bulge off the wind
-  const mainCurveDepth = 10 + config.fullness * 18;
-  const jibCurveDepth = 8 + config.fullness * 14;
-
-  const mainControl = offsetPoint(mastBase, mainEnd, mainCurveDepth, sailSideSign);
-  const jibControl = offsetPoint(jibTack, jibEnd, jibCurveDepth, sailSideSign);
+  const mainControl = offsetPoint(mainAnchor, mainEnd, config.mainDepth, sailSideSign);
+  const jibControl = offsetPoint(jibAnchor, jibEnd, config.jibDepth, sailSideSign);
 
   const mainPath = `
-    M ${mastBase.x} ${mastBase.y}
+    M ${mainAnchor.x} ${mainAnchor.y}
     Q ${mainControl.x} ${mainControl.y} ${mainEnd.x} ${mainEnd.y}
   `;
 
   const jibPath = `
-    M ${jibTack.x} ${jibTack.y}
+    M ${jibAnchor.x} ${jibAnchor.y}
     Q ${jibControl.x} ${jibControl.y} ${jibEnd.x} ${jibEnd.y}
   `;
 
   const headingArrowEnd = localPolarPoint(cx, cy, 138, boatHeading);
   const headingArrowStart = localPolarPoint(cx, cy, 26, boatHeading);
 
-  const windArrowStart = localPolarPoint(cx, cy, 146, windFrom);
-  const windArrowEnd = localPolarPoint(cx, cy, 82, windFrom);
+  const trueWindArrowStart = localPolarPoint(cx, cy, 146, windFromTrue);
+  const trueWindArrowEnd = localPolarPoint(cx, cy, 88, windFromTrue);
 
-  const arcInfo = getArcDisplayDegrees(boatHeading, windFrom);
+  const apparentWindArrowStart = localPolarPoint(cx, cy, 146, windFromApparent);
+  const apparentWindArrowEnd = localPolarPoint(cx, cy, 72, windFromApparent);
+
+  const arcInfo = getArcDisplayDegrees(boatHeading, windFromApparent);
   const angleArcPath = buildAngleArcPath(cx, cy, 112, arcInfo.start, arcInfo.end);
   const arcMid = localPolarPoint(cx, cy, 124, arcInfo.start + (arcInfo.value / 2));
 
-  const labelWind = localPolarPoint(cx, cy, 160, windFrom);
+  const labelTrueWind = localPolarPoint(cx, cy, 164, windFromTrue);
+  const labelAppWind = localPolarPoint(cx, cy, 156, windFromApparent);
   const labelHeading = localPolarPoint(cx, cy, 154, boatHeading);
 
   const tackLabel = describeTack();
@@ -1382,8 +1529,11 @@ function renderDiagram(pointOfSail) {
   const svg = `
     <svg viewBox="0 0 ${width} ${height}" width="100%" height="100%" aria-label="Sail trim diagram">
       <defs>
-        <marker id="windArrowHead" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto">
-          <polygon points="0 0, 8 3, 0 6" fill="#8be0c8"></polygon>
+        <marker id="trueWindArrowHead" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#56c2a3"></polygon>
+        </marker>
+        <marker id="apparentWindArrowHead" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#70d6ff"></polygon>
         </marker>
         <marker id="headingArrowHead" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto">
           <polygon points="0 0, 8 3, 0 6" fill="#ffd166"></polygon>
@@ -1405,21 +1555,35 @@ function renderDiagram(pointOfSail) {
             fill="${arcColor}"
             font-size="14"
             font-weight="700">
-        ${config.angleOffWind}°
+        ${Math.round(apparent.angleOffBow)}°
       </text>
 
-      <line x1="${windArrowStart.x}" y1="${windArrowStart.y}"
-            x2="${windArrowEnd.x}" y2="${windArrowEnd.y}"
-            stroke="#8be0c8"
+      <line x1="${trueWindArrowStart.x}" y1="${trueWindArrowStart.y}"
+            x2="${trueWindArrowEnd.x}" y2="${trueWindArrowEnd.y}"
+            stroke="#56c2a3"
             stroke-width="4"
-            marker-end="url(#windArrowHead)" />
+            marker-end="url(#trueWindArrowHead)" />
 
-      <text x="${labelWind.x}" y="${labelWind.y}"
+      <text x="${labelTrueWind.x}" y="${labelTrueWind.y}"
             text-anchor="middle"
-            fill="#8be0c8"
-            font-size="13"
+            fill="#56c2a3"
+            font-size="12"
             font-weight="700">
-        Wind
+        True
+      </text>
+
+      <line x1="${apparentWindArrowStart.x}" y1="${apparentWindArrowStart.y}"
+            x2="${apparentWindArrowEnd.x}" y2="${apparentWindArrowEnd.y}"
+            stroke="#70d6ff"
+            stroke-width="4"
+            marker-end="url(#apparentWindArrowHead)" />
+
+      <text x="${labelAppWind.x}" y="${labelAppWind.y}"
+            text-anchor="middle"
+            fill="#70d6ff"
+            font-size="12"
+            font-weight="700">
+        Apparent
       </text>
 
       <line x1="${headingArrowStart.x}" y1="${headingArrowStart.y}"
@@ -1431,7 +1595,7 @@ function renderDiagram(pointOfSail) {
       <text x="${labelHeading.x}" y="${labelHeading.y}"
             text-anchor="middle"
             fill="#ffd166"
-            font-size="13"
+            font-size="12"
             font-weight="700">
         Heading
       </text>
@@ -1442,25 +1606,20 @@ function renderDiagram(pointOfSail) {
                stroke="#0b1720"
                stroke-width="2" />
 
-      <!-- Main sail curve -->
       <path d="${mainPath}"
             fill="none"
             stroke="#55a630"
             stroke-width="6"
             stroke-linecap="round" />
 
-      <!-- Headsail curve -->
       <path d="${jibPath}"
             fill="none"
             stroke="#74b816"
             stroke-width="6"
             stroke-linecap="round" />
 
-      <circle cx="${mastBase.x}" cy="${mastBase.y}" r="4.5" fill="#1c7ed6" />
-      
-
-      <circle cx="${jibTack.x}" cy="${jibTack.y}" r="4.5" fill="#1c7ed6" />
-      
+      <circle cx="${mainAnchor.x}" cy="${mainAnchor.y}" r="5" fill="#1c7ed6" />
+      <circle cx="${jibAnchor.x}" cy="${jibAnchor.y}" r="5" fill="#1c7ed6" />
 
       <text x="${cx}" y="330"
             text-anchor="middle"
@@ -1481,7 +1640,14 @@ function renderDiagram(pointOfSail) {
             text-anchor="middle"
             fill="#a9c0c9"
             font-size="12">
-        Main ${Math.abs(config.mainAngle)}° • Headsail ${Math.abs(config.jibAngle)}°
+        True ${trueWindSpeed.toFixed(1)} kt • Apparent ${apparent.speed.toFixed(1)} kt
+      </text>
+
+      <text x="${cx}" y="383"
+            text-anchor="middle"
+            fill="#a9c0c9"
+            font-size="11">
+        Sails trimmed to apparent wind
       </text>
     </svg>
   `;
@@ -1490,21 +1656,17 @@ function renderDiagram(pointOfSail) {
 }
 
 function renderResults(recommendation, input) {
-  const results = document.getElementById("results");
+  const results = $("results");
+  if (!results) return;
 
-  const reasoningItems = recommendation.reasoning
-    .map((item) => `<li>${item}</li>`)
-    .join("");
-
-  const boatNotes = recommendation.boatProfile.notes
-    .map((item) => `<li>${item}</li>`)
-    .join("");
-
+  const reasoningItems = recommendation.reasoning.map((item) => `<li>${item}</li>`).join("");
+  const boatNotes = recommendation.boatProfile.notes.map((item) => `<li>${item}</li>`).join("");
   const watchItems = recommendation.watchNext.length
     ? recommendation.watchNext.map((item) => `<li>${item}</li>`).join("")
     : "<li>Keep checking helm balance, heel, and sail flow after each change.</li>";
 
-  const diagramConfig = getDiagramConfig(input.pointOfSail, input.boatBearing, input.windDirection);
+  const apparentPointOfSail = getPointOfSailFromAngle(recommendation.apparent.angleOffBow);
+  const diagramConfig = getDiagramConfig(apparentPointOfSail, input.boatBearing, input.windDirection);
 
   results.innerHTML = `
     <div class="summary-cards">
@@ -1517,12 +1679,12 @@ function renderResults(recommendation, input) {
         <div class="value">${recommendation.profile.label}</div>
       </div>
       <div class="mini-card">
-        <div class="label">Angle off wind</div>
-        <div class="value">${getAngleOffWind(input.boatBearing, input.windDirection)}°</div>
+        <div class="label">Apparent angle</div>
+        <div class="value">${Math.round(recommendation.apparent.angleOffBow)}°</div>
       </div>
       <div class="mini-card">
-        <div class="label">Steady / gust</div>
-        <div class="value">${input.windSpeed} / ${input.gustSpeed} kt</div>
+        <div class="label">Apparent wind</div>
+        <div class="value">${recommendation.apparent.speed.toFixed(1)} kt</div>
       </div>
     </div>
 
@@ -1565,10 +1727,10 @@ function renderResults(recommendation, input) {
 
     <div class="footer-tip">
       <strong>Trim memory card:</strong>
-      upwind tends toward flat and tidy,
-      reaching wants power with control,
-      and downwind wants fuller sails with stronger vang support.
-      In building breeze, reefing early is often the smartest move.
+      trim sails to the apparent wind, not just the forecast.
+      Upwind tends toward flatter and tighter,
+      reaching wants controlled power,
+      and downwind wants fuller shapes with stable support.
     </div>
 
     <div class="disclaimer">
@@ -1577,48 +1739,50 @@ function renderResults(recommendation, input) {
     </div>
   `;
 
-  renderDiagram(input.pointOfSail);
+  renderDiagram(apparentPointOfSail);
 }
 
 function getFormInput() {
   return {
-    boatProfile: document.getElementById("boatProfile").value,
-    pointOfSail: document.getElementById("pointOfSail").value,
-    windSpeed: Number(document.getElementById("windSpeed").value),
-    gustSpeed: Number(document.getElementById("gustSpeed").value),
-    windDirection: Number(document.getElementById("windDirection").value),
-    waveHeight: Number(document.getElementById("waveHeight").value),
-    waveDirection: Number(document.getElementById("waveDirection").value),
-    boatBearing: Number(document.getElementById("boatBearing").value),
-    windTrend: document.getElementById("windTrend").value,
-    seaState: document.getElementById("seaState").value,
-    heel: document.getElementById("heel").value,
-    helm: document.getElementById("helm").value,
-    mainsailSetup: document.getElementById("mainsailSetup").value,
-    headsailSetup: document.getElementById("headsailSetup").value,
-    gusty: document.getElementById("gusty").checked,
-    locationQuery: document.getElementById("locationQuery").value.trim(),
+    boatProfile: $("boatProfile")?.value || "trapper_501",
+    pointOfSail: $("pointOfSail")?.value || "close_hauled",
+    windSpeed: Number($("windSpeed")?.value),
+    gustSpeed: getGustSpeedValue(),
+    windDirection: Number($("windDirection")?.value),
+    waveHeight: Number($("waveHeight")?.value),
+    waveDirection: Number($("waveDirection")?.value),
+    boatBearing: Number($("boatBearing")?.value),
+    boatSpeed: Number($("boatSpeed")?.value || 0),
+    windTrend: $("windTrend")?.value || "steady",
+    seaState: $("seaState")?.value || "chop",
+    heel: $("heel")?.value || "medium",
+    helm: $("helm")?.value || "weather",
+    mainsailSetup: $("mainsailSetup")?.value || "full",
+    headsailSetup: $("headsailSetup")?.value || "genoa_full",
+    gusty: $("gusty")?.checked || false,
+    locationQuery: $("locationQuery")?.value.trim() || "",
     bearingSource: currentBearingSource
   };
 }
 
 function setFormInput(data) {
-  document.getElementById("boatProfile").value = data.boatProfile;
-  document.getElementById("pointOfSail").value = data.pointOfSail;
-  document.getElementById("windSpeed").value = data.windSpeed;
-  document.getElementById("gustSpeed").value = data.gustSpeed ?? data.windSpeed;
-  document.getElementById("windDirection").value = data.windDirection ?? 240;
-  document.getElementById("waveHeight").value = data.waveHeight ?? 0.8;
-  document.getElementById("waveDirection").value = data.waveDirection ?? 250;
-  document.getElementById("boatBearing").value = data.boatBearing ?? 120;
-  document.getElementById("windTrend").value = data.windTrend;
-  document.getElementById("seaState").value = data.seaState;
-  document.getElementById("heel").value = data.heel;
-  document.getElementById("helm").value = data.helm;
-  document.getElementById("mainsailSetup").value = data.mainsailSetup;
-  document.getElementById("headsailSetup").value = data.headsailSetup;
-  document.getElementById("gusty").checked = data.gusty;
-  document.getElementById("locationQuery").value = data.locationQuery ?? "";
+  if ($("boatProfile")) $("boatProfile").value = data.boatProfile;
+  if ($("pointOfSail")) $("pointOfSail").value = data.pointOfSail;
+  if ($("windSpeed")) $("windSpeed").value = data.windSpeed;
+  setGustSpeedValue(data.gustSpeed ?? data.windSpeed);
+  if ($("windDirection")) $("windDirection").value = data.windDirection ?? 240;
+  if ($("waveHeight")) $("waveHeight").value = data.waveHeight ?? 0.8;
+  if ($("waveDirection")) $("waveDirection").value = data.waveDirection ?? 250;
+  if ($("boatBearing")) $("boatBearing").value = data.boatBearing ?? 120;
+  if ($("boatSpeed")) $("boatSpeed").value = data.boatSpeed ?? 0;
+  if ($("windTrend")) $("windTrend").value = data.windTrend;
+  if ($("seaState")) $("seaState").value = data.seaState;
+  if ($("heel")) $("heel").value = data.heel;
+  if ($("helm")) $("helm").value = data.helm;
+  if ($("mainsailSetup")) $("mainsailSetup").value = data.mainsailSetup;
+  if ($("headsailSetup")) $("headsailSetup").value = data.headsailSetup;
+  if ($("gusty")) $("gusty").checked = data.gusty;
+  if ($("locationQuery")) $("locationQuery").value = data.locationQuery ?? "";
   currentBearingSource = data.bearingSource ?? "manual";
   syncPointOfSailFromBearings();
   setBearingStatus(`Bearing source: ${getBearingSourceLabel(currentBearingSource)}.`);
@@ -1638,11 +1802,14 @@ function saveScenarios(scenarios) {
 
 function scenarioTitle(data) {
   const locationText = data.locationQuery ? ` • ${data.locationQuery}` : "";
-  return `${boatProfiles[data.boatProfile].label}${locationText} • ${titleCase(data.pointOfSail)} • ${data.windSpeed} kt steady, ${data.gustSpeed ?? data.windSpeed} kt gusts`;
+  const boatSpeedText = typeof data.boatSpeed === "number" ? ` • ${data.boatSpeed.toFixed(1)} kt boat` : "";
+  return `${boatProfiles[data.boatProfile].label}${locationText}${boatSpeedText} • ${titleCase(data.pointOfSail)} • ${data.windSpeed} kt steady, ${data.gustSpeed ?? data.windSpeed} kt gusts`;
 }
 
 function renderSavedScenarios() {
-  const container = document.getElementById("savedScenarios");
+  const container = $("savedScenarios");
+  if (!container) return;
+
   const scenarios = loadScenarios();
 
   if (!scenarios.length) {
@@ -1652,21 +1819,19 @@ function renderSavedScenarios() {
   }
 
   container.className = "saved-list";
-  container.innerHTML = scenarios
-    .map((scenario, index) => `
-      <div class="saved-item">
-        <div class="saved-item-title">${scenarioTitle(scenario)}</div>
-        <div class="saved-item-meta">
-          ${titleCase(scenario.windTrend)} wind, ${titleCase(scenario.seaState)} sea, ${titleCase(scenario.heel)} heel,
-          ${titleCase(scenario.helm)} helm, ${scenario.gusty ? "gusty" : "not gusty"}
-        </div>
-        <div class="saved-item-actions">
-          <button type="button" class="btn-secondary" onclick="loadScenario(${index})">Load</button>
-          <button type="button" class="btn-secondary" onclick="deleteScenario(${index})">Delete</button>
-        </div>
+  container.innerHTML = scenarios.map((scenario, index) => `
+    <div class="saved-item">
+      <div class="saved-item-title">${scenarioTitle(scenario)}</div>
+      <div class="saved-item-meta">
+        ${titleCase(scenario.windTrend)} wind, ${titleCase(scenario.seaState)} sea, ${titleCase(scenario.heel)} heel,
+        ${titleCase(scenario.helm)} helm, ${scenario.gusty ? "gusty" : "not gusty"}
       </div>
-    `)
-    .join("");
+      <div class="saved-item-actions">
+        <button type="button" class="btn-secondary" onclick="loadScenario(${index})">Load</button>
+        <button type="button" class="btn-secondary" onclick="deleteScenario(${index})">Delete</button>
+      </div>
+    </div>
+  `).join("");
 }
 
 function saveCurrentScenario() {
@@ -1701,16 +1866,26 @@ function loadScenario(index) {
     scenario.waveDirection ?? 250,
     scenario.seaState ?? "chop",
     scenario.boatBearing ?? 120,
-    scenario.bearingSource ?? "manual"
+    scenario.bearingSource ?? "manual",
+    Number(scenario.boatSpeed ?? 0)
   );
 
   const payload = {
     ...scenario,
     boatBearing: scenario.boatBearing ?? 120,
-    pointOfSail: getPointOfSailFromBearings(scenario.boatBearing ?? 120, scenario.windDirection ?? 240)
+    boatSpeed: Number(scenario.boatSpeed ?? 0)
   };
 
-  document.getElementById("pointOfSail").value = payload.pointOfSail;
+  const apparent = getApparentWindData(
+    payload.windSpeed,
+    payload.windDirection ?? 240,
+    payload.boatSpeed,
+    payload.boatBearing
+  );
+
+  payload.pointOfSail = getPointOfSailFromAngle(apparent.angleOffBow);
+  if ($("pointOfSail")) $("pointOfSail").value = payload.pointOfSail;
+
   updatePointOfSailAngleDisplay();
   const recommendation = buildRecommendation(payload);
   renderResults(recommendation, payload);
@@ -1728,18 +1903,48 @@ function clearScenarios() {
   renderSavedScenarios();
 }
 
-document.getElementById("fetchConditionsBtn").addEventListener("click", async function () {
+function updateAdviceLive() {
+  syncPointOfSailFromBearings();
+
+  const input = getFormInput();
+  const validationError = validateInput(input);
+
+  if (validationError) return;
+
+  const recommendation = buildRecommendation(input);
+  renderResults(recommendation, input);
+
+  const liveCard = $("liveConditionsCard");
+  if (liveCard && !liveCard.classList.contains("hidden")) {
+    updateLiveConditionsCard(
+      $("liveConditionsPlace")?.textContent || "Live conditions",
+      ($("liveConditionsTime")?.textContent || "").replace("Forecast time: ", "") || "Current",
+      input.windSpeed,
+      input.gustSpeed,
+      input.windDirection,
+      input.waveHeight,
+      input.waveDirection,
+      input.seaState,
+      input.boatBearing,
+      currentBearingSource,
+      input.boatSpeed
+    );
+  }
+}
+
+safeAddListener("fetchConditionsBtn", "click", async () => {
   await fetchLiveConditions();
 });
 
-document.getElementById("detectBearingBtn").addEventListener("click", async function () {
+safeAddListener("detectBearingBtn", "click", async () => {
   await detectBoatBearing();
 
-  if (!document.getElementById("liveConditionsCard").classList.contains("hidden")) {
+  const liveCard = $("liveConditionsCard");
+  if (liveCard && !liveCard.classList.contains("hidden")) {
     const input = getFormInput();
     updateLiveConditionsCard(
-      document.getElementById("liveConditionsPlace").textContent || "Live conditions",
-      document.getElementById("liveConditionsTime").textContent.replace("Forecast time: ", "") || "Current",
+      $("liveConditionsPlace")?.textContent || "Live conditions",
+      ($("liveConditionsTime")?.textContent || "").replace("Forecast time: ", "") || "Current",
       input.windSpeed,
       input.gustSpeed,
       input.windDirection,
@@ -1747,54 +1952,38 @@ document.getElementById("detectBearingBtn").addEventListener("click", async func
       input.waveDirection,
       input.seaState,
       input.boatBearing,
-      currentBearingSource
+      currentBearingSource,
+      input.boatSpeed
     );
   }
 });
 
-document.getElementById("boatBearing").addEventListener("input", function () {
+safeAddListener("boatBearing", "input", () => {
   currentBearingSource = "manual";
   setBearingStatus("Bearing source: Manual entry.");
-  syncPointOfSailFromBearings();
-
-  if (!document.getElementById("liveConditionsCard").classList.contains("hidden")) {
-    const input = getFormInput();
-    updateLiveConditionsCard(
-      document.getElementById("liveConditionsPlace").textContent || "Live conditions",
-      document.getElementById("liveConditionsTime").textContent.replace("Forecast time: ", "") || "Current",
-      input.windSpeed,
-      input.gustSpeed,
-      input.windDirection,
-      input.waveHeight,
-      input.waveDirection,
-      input.seaState,
-      input.boatBearing,
-      currentBearingSource
-    );
-  }
+  updateAdviceLive();
 });
 
-document.getElementById("windDirection").addEventListener("input", function () {
-  syncPointOfSailFromBearings();
+safeAddListener("windDirection", "input", updateAdviceLive);
+safeAddListener("boatSpeed", "input", updateAdviceLive);
+safeAddListener("windTrend", "input", updateAdviceLive);
+safeAddListener("windSpeed", "input", updateAdviceLive);
+safeAddListener("waveHeight", "input", updateAdviceLive);
+safeAddListener("waveDirection", "input", updateAdviceLive);
+safeAddListener("seaState", "input", updateAdviceLive);
+safeAddListener("heel", "input", updateAdviceLive);
+safeAddListener("helm", "input", updateAdviceLive);
+safeAddListener("mainsailSetup", "input", updateAdviceLive);
+safeAddListener("headsailSetup", "input", updateAdviceLive);
+safeAddListener("boatProfile", "input", updateAdviceLive);
+safeAddListener("gusty", "change", updateAdviceLive);
 
-  if (!document.getElementById("liveConditionsCard").classList.contains("hidden")) {
-    const input = getFormInput();
-    updateLiveConditionsCard(
-      document.getElementById("liveConditionsPlace").textContent || "Live conditions",
-      document.getElementById("liveConditionsTime").textContent.replace("Forecast time: ", "") || "Current",
-      input.windSpeed,
-      input.gustSpeed,
-      input.windDirection,
-      input.waveHeight,
-      input.waveDirection,
-      input.seaState,
-      input.boatBearing,
-      currentBearingSource
-    );
-  }
-});
+const gustEl = getGustSpeedInputElement();
+if (gustEl) {
+  gustEl.addEventListener("input", updateAdviceLive);
+}
 
-document.getElementById("locationQuery").addEventListener("input", function (event) {
+safeAddListener("locationQuery", "input", (event) => {
   const query = event.target.value;
   selectedLocation = null;
 
@@ -1804,14 +1993,14 @@ document.getElementById("locationQuery").addEventListener("input", function (eve
   }, 250);
 });
 
-document.getElementById("locationQuery").addEventListener("focus", function (event) {
+safeAddListener("locationQuery", "focus", (event) => {
   const query = event.target.value;
   if (query.trim().length >= 2) {
     fetchLocationSuggestions(query);
   }
 });
 
-document.getElementById("locationSuggestions").addEventListener("click", async function (event) {
+safeAddListener("locationSuggestions", "click", async (event) => {
   const button = event.target.closest(".suggestion-item");
   if (!button) return;
 
@@ -1822,16 +2011,16 @@ document.getElementById("locationSuggestions").addEventListener("click", async f
   await applyLocationSuggestion(place);
 });
 
-document.addEventListener("click", function (event) {
-  const input = document.getElementById("locationQuery");
-  const suggestions = document.getElementById("locationSuggestions");
+document.addEventListener("click", (event) => {
+  const input = $("locationQuery");
+  const suggestions = $("locationSuggestions");
 
-  if (!input.contains(event.target) && !suggestions.contains(event.target)) {
+  if (input && suggestions && !input.contains(event.target) && !suggestions.contains(event.target)) {
     hideLocationSuggestions();
   }
 });
 
-document.getElementById("trimForm").addEventListener("submit", function (event) {
+safeAddListener("trimForm", "submit", (event) => {
   event.preventDefault();
 
   syncPointOfSailFromBearings();
@@ -1849,7 +2038,7 @@ document.getElementById("trimForm").addEventListener("submit", function (event) 
   renderResults(recommendation, input);
 });
 
-document.getElementById("saveScenarioBtn").addEventListener("click", function () {
+safeAddListener("saveScenarioBtn", "click", () => {
   syncPointOfSailFromBearings();
 
   const input = getFormInput();
@@ -1864,16 +2053,18 @@ document.getElementById("saveScenarioBtn").addEventListener("click", function ()
   saveCurrentScenario();
 });
 
-document.getElementById("resetBtn").addEventListener("click", function () {
-  document.getElementById("trimForm").reset();
-  document.getElementById("windSpeed").value = 14;
-  document.getElementById("gustSpeed").value = 18;
-  document.getElementById("windDirection").value = 240;
-  document.getElementById("waveHeight").value = 0.8;
-  document.getElementById("waveDirection").value = 250;
-  document.getElementById("boatBearing").value = 120;
-  document.getElementById("heel").value = "medium";
-  document.getElementById("helm").value = "weather";
+safeAddListener("resetBtn", "click", () => {
+  $("trimForm")?.reset();
+
+  if ($("windSpeed")) $("windSpeed").value = 14;
+  setGustSpeedValue(18);
+  if ($("windDirection")) $("windDirection").value = 240;
+  if ($("waveHeight")) $("waveHeight").value = 0.8;
+  if ($("waveDirection")) $("waveDirection").value = 250;
+  if ($("boatBearing")) $("boatBearing").value = 120;
+  if ($("boatSpeed")) $("boatSpeed").value = 0;
+  if ($("heel")) $("heel").value = "medium";
+  if ($("helm")) $("helm").value = "weather";
 
   currentBearingSource = "manual";
   selectedLocation = null;
@@ -1884,67 +2075,12 @@ document.getElementById("resetBtn").addEventListener("click", function () {
   hideLiveConditionsCard();
   hideLocationSuggestions();
 
-  document.getElementById("results").innerHTML =
-    'Search a location or enter the conditions manually, then click <strong>Get trim advice</strong>.';
-});
-
-document.getElementById("clearScenariosBtn").addEventListener("click", function () {
-  clearScenarios();
-});
-
-const liveUpdateIds = [
-  "windTrend",
-  "windSpeed",
-  "gustSpeed",
-  "windDirection",
-  "waveHeight",
-  "waveDirection",
-  "seaState",
-  "heel",
-  "helm",
-  "mainsailSetup",
-  "headsailSetup",
-  "gusty",
-  "boatProfile",
-  "boatBearing"
-];
-
-function updateAdviceLive() {
-  syncPointOfSailFromBearings();
-
-  const input = getFormInput();
-  const validationError = validateInput(input);
-
-  if (validationError) {
-    return;
+  if ($("results")) {
+    $("results").innerHTML = 'Search a location or enter the conditions manually, then click <strong>Get Trim Advice</strong>.';
   }
-
-  const recommendation = buildRecommendation(input);
-  renderResults(recommendation, input);
-
-  if (!document.getElementById("liveConditionsCard").classList.contains("hidden")) {
-    updateLiveConditionsCard(
-      document.getElementById("liveConditionsPlace").textContent || "Live conditions",
-      document.getElementById("liveConditionsTime").textContent.replace("Forecast time: ", "") || "Current",
-      input.windSpeed,
-      input.gustSpeed,
-      input.windDirection,
-      input.waveHeight,
-      input.waveDirection,
-      input.seaState,
-      input.boatBearing,
-      currentBearingSource
-    );
-  }
-}
-
-liveUpdateIds.forEach((id) => {
-  const el = document.getElementById(id);
-  if (!el) return;
-
-  const eventName = el.type === "checkbox" ? "change" : "input";
-  el.addEventListener(eventName, updateAdviceLive);
 });
+
+safeAddListener("clearScenariosBtn", "click", clearScenarios);
 
 renderSavedScenarios();
 hideLiveConditionsCard();

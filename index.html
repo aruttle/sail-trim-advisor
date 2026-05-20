@@ -72,6 +72,11 @@
               </div>
             </div>
 
+            <div class="field">
+              <label for="boatSpeed">Boat speed (knots)</label>
+              <input id="boatSpeed" type="number" min="0" max="20" step="0.1" value="0" />
+            </div>
+
             <div class="quick-read-grid">
               <div class="field">
                 <label for="pointOfSail">Point of sail</label>
@@ -83,13 +88,13 @@
                   <option value="broad_reach">Broad reach</option>
                   <option value="run">Run</option>
                 </select>
-                <div class="auto-field-note">Auto-calculated from boat and wind bearing.</div>
+                <div class="auto-field-note">Auto-calculated from apparent wind and heading.</div>
               </div>
 
               <div class="field">
                 <label for="pointOfSailAngle">Angle off the wind</label>
                 <input id="pointOfSailAngle" type="text" value="--" disabled />
-                <div class="auto-field-note">Smallest angle between heading and wind direction.</div>
+                <div class="auto-field-note">Smallest angle between heading and apparent wind direction.</div>
               </div>
             </div>
 
@@ -109,37 +114,28 @@
 
                 <div class="live-conditions-grid cockpit-live-grid">
                   <div class="mini-card live-key-card">
-                    <div class="label">Steady wind</div>
-                    <div id="liveWindSpeed" class="value big-value">--</div>
+                    <div class="label">True wind</div>
+                    <div id="liveTrueWindSpeed" class="value big-value">--</div>
+                    <div id="liveTrueWindDirection" class="mini-subvalue">--</div>
+                    <div id="liveGustSpeed" class="mini-subvalue">Gusts: --</div>
                   </div>
 
                   <div class="mini-card live-key-card">
-                    <div class="label">Gusts</div>
-                    <div id="liveGustSpeed" class="value big-value">--</div>
+                    <div class="label">Apparent wind</div>
+                    <div id="liveApparentWindSpeed" class="value big-value">--</div>
+                    <div id="liveApparentWindDirection" class="mini-subvalue">--</div>
+                    <div id="liveApparentWindAngle" class="mini-subvalue">--</div>
                   </div>
 
                   <div class="mini-card live-key-card">
-                    <div class="label">Wind direction</div>
-                    <div id="liveWindDirection" class="value">--</div>
-                  </div>
-
-                  <div class="mini-card live-key-card">
-                    <div class="label">Wave height</div>
+                    <div class="label">Waves</div>
                     <div id="liveWaveHeight" class="value big-value">--</div>
+                    <div id="liveWaveDirection" class="mini-subvalue">--</div>
+                    <div id="liveSeaState" class="mini-subvalue">--</div>
                   </div>
 
                   <div class="mini-card live-key-card">
-                    <div class="label">Wave direction</div>
-                    <div id="liveWaveDirection" class="value">--</div>
-                  </div>
-
-                  <div class="mini-card live-key-card">
-                    <div class="label">Sea state</div>
-                    <div id="liveSeaState" class="value">--</div>
-                  </div>
-
-                  <div class="mini-card live-key-card">
-                    <div class="label">Boat bearing</div>
+                    <div class="label">Boat</div>
                     <div id="liveBoatBearing" class="value">--</div>
                     <div id="liveBearingSource" class="mini-subvalue">Source: --</div>
                   </div>
@@ -147,11 +143,7 @@
                   <div class="mini-card live-key-card">
                     <div class="label">Sea relationship</div>
                     <div id="liveSeaRelationship" class="value">--</div>
-                  </div>
-
-                  <div class="mini-card live-key-card">
-                    <div class="label">Sea on boat</div>
-                    <div id="liveSeaAngle" class="value">--</div>
+                    <div id="liveSeaAngle" class="mini-subvalue">--</div>
                   </div>
 
                   <div class="mini-card compass-card">
